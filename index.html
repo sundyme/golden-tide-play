@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>金潮号 GOLDEN TIDE</title>
+  <meta name="theme-color" content="#050b1c" />
+  <link rel="icon" href="./public/assets/ui/icon_coin.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=ZCOOL+QingKe+HuangYou&display=swap" />
+  <link rel="stylesheet" href="./src/ui/ui.css" />
+  <style>
+    :root { --ink: #ffe9c2; --bg: #0b1a33; }
+    html, body { margin: 0; height: 100%; background: #070d1c; color: var(--ink); font: 13px/1.4 -apple-system, "Hiragino Sans GB", sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #stage { position: absolute; inset: 0; display: grid; place-items: center; }
+    #frame { position: relative; aspect-ratio: 9 / 16; height: 100%; max-width: 100%; background: var(--bg); overflow: hidden; container-type: size; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #stats { position: absolute; left: 10px; bottom: 26cqw; z-index: 3; font-size: 11px; opacity: .65; pointer-events: none; white-space: pre; font-family: ui-monospace, monospace; }
+    #loading { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: var(--bg); transition: opacity .4s; }
+    /* 加载页：装饰艺术风的进度条（藏蓝珐琅槽 + 香槟金描边 + 金色进度 + 流光），两端各一颗菱形饰钉 */
+    #loading { --u: min(1cqw, .8vh); background: radial-gradient(70% 45% at 50% 42%, #14305a 0%, #0a1830 55%, #050b18 100%); }
+    #loading .inner { display: flex; flex-direction: column; align-items: center; }
+    #loading .logo { width: calc(62 * var(--u)); filter: drop-shadow(0 calc(1.4 * var(--u)) calc(2 * var(--u)) #000a) drop-shadow(0 0 calc(4 * var(--u)) #ffc23a33); animation: loadfloat 3s ease-in-out infinite; }
+    #loading .track { position: relative; width: calc(56 * var(--u)); margin-top: calc(7 * var(--u)); display: flex; align-items: center; justify-content: center; }
+    #loading .track::before, #loading .track::after { content: ""; position: absolute; top: 50%; width: calc(2.4 * var(--u)); height: calc(2.4 * var(--u)); background: linear-gradient(135deg, #fff1c8, #d9b46a 50%, #8e6a30); transform: translateY(-50%) rotate(45deg); box-shadow: 0 0 calc(1.4 * var(--u)) #ffc23a66; }
+    #loading .track::before { left: calc(-1.2 * var(--u)); } #loading .track::after { right: calc(-1.2 * var(--u)); }
+    #loading .bar { width: calc(100% - calc(4.4 * var(--u))); height: calc(2.4 * var(--u)); border-radius: calc(1.2 * var(--u)); background: linear-gradient(180deg, #06101f, #0e2840); box-shadow: inset 0 0 0 calc(.3 * var(--u)) #d9b46a, inset 0 calc(.4 * var(--u)) calc(.6 * var(--u)) #000a, 0 0 calc(2 * var(--u)) #000a; padding: calc(.55 * var(--u)); box-sizing: border-box; }
+    #loading .bar i { position: relative; display: block; height: 100%; width: 0; border-radius: calc(.7 * var(--u)); background: linear-gradient(180deg, #fff1c8 0%, #ffd36a 45%, #c47a1c 100%); box-shadow: 0 0 calc(1.6 * var(--u)) #ffc23a99; transition: width .35s ease-out; overflow: hidden; }
+    #loading .bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, #fff9 50%, transparent 70%) -100% 0/60% 100% no-repeat; animation: loadshine 1.6s linear infinite; }
+    #loading .msg { margin-top: calc(3.4 * var(--u)); font: calc(3.6 * var(--u)) "ZCOOL QingKe HuangYou", "Hiragino Sans GB", sans-serif; letter-spacing: .4em; text-indent: .4em; color: #e9d3a0; opacity: .85; }
+    @keyframes loadshine { to { background-position: 250% 0; } }
+    @keyframes loadfloat { 50% { transform: translateY(calc(-1 * var(--u))); } }
+    .lil-gui.root { position: absolute; top: 44px; right: 6px; z-index: 20; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/dist/rapier.mjs",
+      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="stage">
+    <div id="frame">
+      <div id="loading"><div class="inner"><img class="logo" src="./public/assets/ui/logo.webp" alt=""><div class="track"><div class="bar"><i id="loadbar"></i></div></div><div class="msg">起锚中…</div></div></div>
+      <div id="stats"></div>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
