@@ -146,6 +146,12 @@ export class PusherPhysics {
     return o;
   }
 
+  // 瞬移（藏宝图兜底用）：清掉速度，渲染插值的上一帧位姿也一起挪，不会拖出一道残影
+  teleport(c, p) {
+    c.body.setTranslation(p, true); c.body.setLinvel({ x: 0, y: 0, z: 0 }, true); c.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    if (c.prevP) { c.prevP.x = p.x; c.prevP.y = p.y; c.prevP.z = p.z; }
+  }
+
   spawnCoin(x, y, z, opts = {}) { return this.spawn('coin', x, y, z, opts); }
 
   dropCoin(x) {

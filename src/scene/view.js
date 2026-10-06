@@ -354,7 +354,7 @@ export class GameView {
       case 'cannonFire': {
         const c = this.cannons[e.side < 0 ? 0 : 1];
         c.recoil = 1;
-        if (e.k < 2 || e.k % 6 < 2) { FX.muzzle(c.barrel.localToWorld(this.muzzleLocal.clone())); D.bump(0.25); }
+        if (e.k < 2 || e.k % 6 < 2) { FX.muzzle(c.barrel.localToWorld(this.muzzleLocal.clone())); if (e.big) D.bump(0.25); }   // 只有 Jackpot 齐射震镜头；平时的发币齐射只闪炮口
         break;
       }
       case 'jackpotTitle': D.set('play', null, 1.6); break;
@@ -532,5 +532,6 @@ export class GameView {
     if (kind === 'gift') this.effects.burst(p.clone().add(new THREE.Vector3(0.6, 0.6, 0.6)), 0xffd76a, 12, 0.5, 5);
   }
   spinScreen() { return this.toScreen(this.machine.spinAnchor.getWorldPosition(this._gazeV.clone())); }
+  tableScreen(x, z, y = 0.3) { return this.toScreen(new THREE.Vector3(x, y, z)); }
   chestScreen() { return this.toScreen(new THREE.Vector3(0, DECK_Y + 2.5, this.chestZ)); }
 }

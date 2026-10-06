@@ -274,11 +274,11 @@ export class GameAudio {
         this._noise(t, 2.5, { gain: 0.25, filter: ['highpass', 5000], attack: 0.01, rev: 0.6 });
         this.duckMusic(0.15, 2.2); this.haptic([100, 50, 100]);
         break;
-      case 'cannonFire': if (e.k < 2 || e.k % 6 < 2) { this._boom(t, 0.7, 0.55); } this.clink(t + 0.7, { gain: 0.18 }); if (e.k % 6 === 0) this.haptic(30); break;
+      case 'cannonFire': if (e.k < 2 || e.k % 6 < 2) this._boom(t, e.big ? 0.7 : 0.45, e.big ? 0.55 : 0.3); this.clink(t + (e.flight ?? 1) * 0.9, { gain: 0.18 }); if (e.big && e.k % 6 === 0) this.haptic(30); break;   // 平时的发币齐射炮声轻一点；落台的叮当声跟着飞行时间走
       case 'jackpotTitle': this._fanfare(t); this.duckMusic(0.3, 1.6); break;
       case 'jackpotCount': for (let i = 0; i < 18; i++) this.clink(t + i * 0.05, { gain: 0.22, rate: 1 + i * 0.02 }); break;
       case 'itemUse':
-        if (e.item === 'coinrain') { this._noise(t, 0.8, { gain: 0.2, filter: ['bandpass', 600, 4000] }); for (let i = 0; i < 20; i++) this.clink(t + 0.4 + i * 0.07, { gain: 0.14 }); }
+        if (e.item === 'coinrain') { this._noise(t + 1.2, 0.8, { gain: 0.16, filter: ['bandpass', 600, 4000] }); for (let i = 0; i < 20; i++) this.clink(t + 1.4 + i * 0.09, { gain: 0.12 }); }   // 金币雨由船炮吊射：落雨声推迟到金币落下
         if (e.item === 'guard') { this._osc('sawtooth', 300, t, 0.5, { gain: 0.08, glide: 1200, filter: ['bandpass', 1500] }); this._osc('sine', mtof(91), t + 0.4, 1, { gain: 0.08, rev: 0.6 }); }
         if (e.item === 'giant') this.impact(1, t + 0.4, 0.6);
         break;

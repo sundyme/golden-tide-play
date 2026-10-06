@@ -68,9 +68,9 @@ export const CONFIG = {
 
   play: {
     startCoins: 60,
-    refillEvery: 4,          // 币用完后每 4 秒补 1 枚
+    refillEvery: 4,          // 钱包低于 refillCap 时每 4 秒补 1 枚（离开一会儿回来就有 20 枚）
     refillCap: 20,
-    holdDropInterval: 0.22,  // 长按连投的限速
+    holdDropInterval: 0.30,  // 长按连投的限速（0.22 时每秒 4.5 枚，远超台面吸收速度，8 局 7 局破产）
     comboWindow: 0.9,        // 连续掉落计为连击的间隔
   },
 
@@ -117,9 +117,11 @@ export const CONFIG = {
 
   jackpot: { slowmo: 0.25, slowmoSeconds: 0.6, cannonCoins: 36, waterfallCoins: 30, bonus: 50, cannonFrom: [3.94, -1.14, 4.66] },  // cannonFrom：炮口出币点（x 取 ±；船头甲板上的炮，view.js 会按炮口实测覆盖）
 
-  map: { pieces: 5, firstAt: 45, every: [80, 100], respawnAfterLost: 20, dropX: 1.8 },
+  // 藏宝图：每开转一次老虎机，下一片提前 spinAdvance 秒（瞄得准 → 转得多 → 更快集齐）；台上放了 rescueAfter 秒还没推下来
+  // （常见是被推板压住、推不动）就由鹦鹉叼回下层台面前半区，避免终局永久卡死
+  map: { pieces: 5, firstAt: 30, every: [130, 150], spinAdvance: 3.5, rescueAfter: 150, respawnAfterLost: 20, dropX: 1.8 },
 
-  ending: { sailSeconds: 6, chestTipDelay: 1.2, chestCoins: 90, cardDelay: 6.5 },
+  ending: { sailSeconds: 6, chestTipDelay: 1.2, chestCoins: 60, cardDelay: 6.5 },
 
   // 鹦鹉互动：戳满 pokesPerGift 下，鹦鹉从嘴里甩出几枚金币到台面（冷却按游戏时间计，几乎不影响平衡）
   parrot: { pokesPerGift: 8, giftCoins: 3, giftCooldown: 45, from: [-4.4, 6.9, -4.9], vel: [3.2, 1.2, 1.4] },

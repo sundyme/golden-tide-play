@@ -82,8 +82,8 @@ export class Game {
     this.stats.items[it] = (this.stats.items[it] || 0) + 1;
     const M = this.cfg.machine;
     if (it === 'coinrain') {
-      const n = this.cfg.items.coinRain;
-      for (let k = 0; k < n; k++) this.after(k * 0.07, () => this.sim.spawnCoin((this.rng() * 2 - 1) * (M.width / 2 - 0.7), M.dropY + this.rng() * 1.5, -4.6 + this.rng() * 2.4, { tiltX: this.rng(), tiltZ: this.rng() }));
+      // 两门船炮朝天高吊射，金币像雨一样落在上层台面（落点范围和原来从天上撒的一样）
+      this._cannonVolley(this.cfg.items.coinRain, { gap: 0.09, flight: 1.5, z: [-4.6, -2.2] });
     } else if (it === 'guard') {
       this.guardT = this.cfg.items.guardSeconds;
       this.sim.setGuards(true);
@@ -103,10 +103,10 @@ export class Game {
       if (this.time >= this.scheduled[i].t) { const s = this.scheduled[i]; this.scheduled.splice(i, 1); s.fn(); }
     }
 
-    // 币用完：缓慢补币
-    if (this.wallet <= 0) {
+    // 补给：钱包低于上限时缓慢补币（以前只在归零时计时，补到 1 枚就清零，上限 20 从来到不了）
+    if (this.wallet < P.refillCap && !this.ending) {
       this.refillT += dt;
-      if (this.refillT >= P.refillEvery) { this.refillT = 0; if (this.wallet < P.refillCap) { this.wallet++; this.emit('refill'); } }
+      if (this.refillT >= P.refillEvery) { this.refillT = 0; this.wallet++; this.emit('refill'); }
     } else this.refillT = 0;
 
     // 连击计时
@@ -230,6 +230,7 @@ export class Game {
         S.stops = [C.stop1, C.stop2, C.stop3 + (tease ? C.tease : 0)];
         S.t = 0; S.state = 'spin'; S.stopped = 0;
         this.stats.spins++;
+        if (!this.ending) this.nextMapT -= this.cfg.map.spinAdvance;   // 开转越多，下一片藏宝图来得越早
         this.emit('spinStart', { grid: S.grid, stops: S.stops, queue: S.queue, tease });
       }
       return;
@@ -250,7 +251,13 @@ export class Game {
       if (this.items.length < this.cfg.items.max) { this.items.push(it); this.emit('itemGain', { item: it, slot: this.items.length - 1 }); }
       else this.useItem(0) && this.items.push(it);   // 道具栏满：自动用掉最早的，新道具入栏
     };
-    const dropCoins = n => { for (let k = 0; k < n; k++) this.after(0.12 * k, () => this.sim.dropCoin((this.rng() * 2 - 1) * M.dropXRange)); this.bonus += n; };
+    // 老虎机发币：小额（+2）还从投币口落；6 枚以上（金币堆 8 格、金潮满盘、多线奖励）由船炮打上台面，
+    // 落点仍在上层台面（和投币口落币差不多远），不改变推落节奏
+    const dropCoins = n => {
+      if (n >= 6) this._cannonVolley(n, { gap: 0.1, flight: 1.1, z: [-4.4, -1.6] });
+      else for (let k = 0; k < n; k++) this.after(0.12 * k, () => this.sim.dropCoin((this.rng() * 2 - 1) * M.dropXRange));
+      this.bonus += n;
+    };
     const syms = ev.lines.map(l => l.symbol);
     let jackpot = false, guard = false;
     for (const s of syms) {
@@ -284,16 +291,7 @@ export class Game {
     this.after(J.slowmoSeconds * J.slowmo, () => { this.timeScale = 1; this.emit('jackpotCannons'); });
     // 宝箱两侧的船炮朝台面喷金币
     const t0 = J.slowmoSeconds * J.slowmo + 0.5;
-    for (let k = 0; k < J.cannonCoins; k++) {
-      const s = k % 2 ? 1 : -1;
-      this.after(t0 + k * 0.06, () => {
-        const tx = (this.rng() * 2 - 1) * (M.width / 2 - 1.2), tz = -1.5 + this.rng() * 4.2;
-        const [fx, fy, fz] = J.cannonFrom; const from = { x: s * fx, y: fy, z: fz };
-        const v = ballistic(from, { x: tx, y: 0.4, z: tz }, 1.0, this.cfg.physics.gravity);   // 炮在船头甲板上：弧线要高过台面前沿
-        this.sim.spawn('coin', from.x, from.y, from.z, { vel: v, fly: 1.2, angvel: { x: this.rng() * 20 - 10, y: 0, z: this.rng() * 20 - 10 } });
-        this.emit('cannonFire', { side: s, k });
-      });
-    }
+    this._cannonVolley(J.cannonCoins, { t0, gap: 0.06, big: true });
     this.after(t0 + J.cannonCoins * 0.06 + 0.3, () => this.emit('jackpotTitle'));
     // 金币瀑布：从投币口一排倾泻
     const t1 = t0 + J.cannonCoins * 0.06 + 0.9;
@@ -301,6 +299,22 @@ export class Game {
     const t2 = t1 + J.waterfallCoins * 0.05 + 0.6;
     this.after(t2, () => { this.wallet += J.bonus; this.won += J.bonus; this.bonus += J.bonus; this.emit('jackpotCount', { value: J.bonus }); });
     this.after(t2 + 2.6, () => { this.jackpot = null; this.emit('jackpotEnd'); });
+  }
+
+  // 船炮齐射：两门炮轮流把 n 枚金币打上台面。炮在船头甲板上、低于台面，弧线要先高过台面前沿；
+  // flight 越长弧线越高（金币雨是朝天吊射），z 为落点前后范围；big = Jackpot 级（镜头震动、重炮声）
+  _cannonVolley(n, { t0 = 0, gap = 0.1, flight = 1.0, z = [-1.5, 2.7], big = false } = {}) {
+    const J = this.cfg.jackpot, M = this.cfg.machine;
+    for (let k = 0; k < n; k++) {
+      const s = k % 2 ? 1 : -1;
+      this.after(t0 + k * gap, () => {
+        const tx = (this.rng() * 2 - 1) * (M.width / 2 - 1.2), tz = z[0] + this.rng() * (z[1] - z[0]);
+        const [fx, fy, fz] = J.cannonFrom; const from = { x: s * fx, y: fy, z: fz };
+        const v = ballistic(from, { x: tx, y: 0.4, z: tz }, flight, this.cfg.physics.gravity);
+        this.sim.spawn('coin', from.x, from.y, from.z, { vel: v, fly: flight + 0.3, angvel: { x: this.rng() * 20 - 10, y: 0, z: this.rng() * 20 - 10 } });
+        this.emit('cannonFire', { side: s, k, n, big, flight });
+      });
+    }
   }
 
   // ---------- 藏宝图与终局 ----------
@@ -312,6 +326,19 @@ export class Game {
       this.mapOnTable++;
       this.nextMapT = this.time + Mp.every[0] + this.rng() * (Mp.every[1] - Mp.every[0]);
       this.emit('specialDrop', { obj: 'map' });
+    }
+    // 兜底：台上放太久的藏宝图（多半被推板压住）由鹦鹉叼到下层台面前半区，重新开始计时
+    const M = this.cfg.machine;
+    for (const c of this.sim.coins) {
+      if (c.kind !== 'map' || c.out) continue;
+      c.rescueAt ??= c.born + Mp.rescueAfter;
+      if (this.sim.time < c.rescueAt) continue;
+      c.rescueAt = this.sim.time + Mp.rescueAfter;
+      const p = c.body.translation(), from = { x: p.x, y: p.y, z: p.z };
+      const to = { x: Math.max(-3, Math.min(3, p.x)), y: 2.5, z: (M.pusherFrontMax + M.tableFrontZ) / 2 + 0.6 };
+      this.sim.teleport(c, to);
+      this.stats.mapRescues = (this.stats.mapRescues || 0) + 1;
+      this.emit('mapRescue', { from, to });
     }
   }
 

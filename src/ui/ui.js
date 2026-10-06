@@ -32,7 +32,7 @@ const HOWTO = `
   <p class="note2">一转中两条线以上，再送道具「巨币」。</p>
   <h3>道具（最多 3 个，点击或按 1 / 2 / 3）</h3>
   <div class="syms items">
-    <div class="sym"><img src="${UI}pw_coinrain.webp" alt=""><b>金币雨</b><span>一大把金币落到台面</span></div>
+    <div class="sym"><img src="${UI}pw_coinrain.webp" alt=""><b>金币雨</b><span>船炮朝天齐射，一大把金币落到台面</span></div>
     <div class="sym"><img src="${UI}pw_shield.webp" alt=""><b>护栏</b><span>两侧升起 20 秒，金币不再掉海</span></div>
     <div class="sym"><img src="${UI}pw_bigcoin.webp" alt=""><b>巨币</b><span>一枚超重的大币，推力十足</span></div>
   </div>
@@ -245,7 +245,15 @@ export class GameUI {
       }
       case 'itemGain': this.say(`拿到「${ITEM[e.item].name}」！点下面用！`, 2); break;
       case 'kegBoom': this.say('轰——！嘎！', 3, 1.4); break;
-      case 'surgeStart': this.banner('大潮！', '台面前倾 · 推板加速', 'teal', 2); this.say('大潮来啦！快投！', 3); break;
+      case 'surgeStart': {
+        this.banner('大潮！', '台面前倾 · 推板加速', 'teal', 2);
+        // 手里有道具：提醒趁大潮用（金币雨 / 护栏叠大潮收益接近翻倍），道具槽一起跳
+        const has = game.items.length > 0;
+        this.say(has ? '大潮！快用道具！' : '大潮来啦！快投！', 3);
+        if (has) for (const el of this.el.slots) if (el.classList.contains('full')) { el.classList.remove('urge'); void el.offsetWidth; el.classList.add('urge'); setTimeout(() => el.classList.remove('urge'), 5000); }
+        break;
+      }
+      case 'mapRescue': { const p = view.tableScreen(e.to.x, e.to.z); this._burst(p.x, p.y, 12, '#ffd36a', 60); this.say('地图卡住啦，我叼过来！', 3); break; }
       case 'jackpotStart': this.el.edge.className = 'gold'; break;
       case 'jackpotTitle': this.banner('JACKPOT', '骷髅三连 · 炮火金雨', 'big', 2.6); this.say('发财啦！嘎嘎嘎！', 3); break;
       case 'jackpotCount': { const p = view.chestScreen(); this.pop(`+${e.value}`, p.x, p.y - 60, 'lg'); break; }
@@ -311,8 +319,9 @@ export class GameUI {
       if (d > 0 && !this.el.plaque.classList.contains('flip')) { const pl = this.el.plaque; pl.classList.add('flip'); if (d >= 6) pl.classList.add('rich'); setTimeout(() => pl.classList.remove('flip', 'rich'), 650); }
     }
     this.el.plaque.classList.toggle('empty', w <= 0);
-    this.el.refill.classList.toggle('on', !!(w <= 0 && this.started));
-    if (w <= 0 && this.started) { const every = game.cfg.play.refillEvery, left = Math.max(0, every - (game.refillT ?? 0)); this.el.refillN.textContent = Math.ceil(left) + 's'; this.el.refillRing.style.setProperty('--p', (1 - left / every).toFixed(3)); }
+    const low = w < game.cfg.play.refillCap && this.started && !game.ending;   // 钱包低于 20：慢慢补给
+    this.el.refill.classList.toggle('on', low);
+    if (low) { const every = game.cfg.play.refillEvery, left = Math.max(0, every - (game.refillT ?? 0)); this.el.refillN.textContent = Math.ceil(left) + 's'; this.el.refillRing.style.setProperty('--p', (1 - left / every).toFixed(3)); }
     if (w <= 0 && this.started && !this.saidEmpty) { this.say('没币了…等等会有补给', 2); this.saidEmpty = true; }
     if (w > 3) this.saidEmpty = false;
     // 推落飘字（0.4 秒内合并）

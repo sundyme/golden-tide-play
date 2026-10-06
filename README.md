@@ -4,4 +4,4 @@
 
 **试玩：https://sundyme.github.io/golden-tide-play/**
 
-手机和电脑浏览器都能玩（推荐 Chrome / Safari 最新版）。本仓库只放发布版本的游戏文件，当前版本 v1.9。
+手机和电脑浏览器都能玩（推荐 Chrome / Safari 最新版）。本仓库只放发布版本的游戏文件，当前版本 v2.0（船炮发币、藏宝图兜底、补给修正）。
