@@ -343,9 +343,10 @@ export class GameView {
       }
       case 'payout': this._payout(e); break;
       case 'lost': this._lost(e); break;
+      case 'kegLit': this.specials.light(e.id, e.fuse); P.set('worry', 1.2, e.fuse); break;
       case 'kegBoom': {
-        const p = new THREE.Vector3(e.x, 0.6, e.z);
-        FX.explosion(p); D.bump(0.9); P.set('worry', 1.2, 3);
+        const p = new THREE.Vector3(e.x, e.sea ? -0.2 : 0.6, e.z);
+        FX.explosion(p); D.bump(e.sea ? 0.5 : 0.9); P.set('worry', 1.2, 3);
         break;
       }
       case 'specialDrop': P.set('worry', 0.9, 1); break;
@@ -526,6 +527,18 @@ export class GameView {
     if (!this.parrotBox || this.director.mode !== 'play') return false;
     this._ray.setFromCamera(this._ndc.set(u * 2 - 1, 1 - v * 2), this.camera);
     return this._ray.ray.intersectsBox(this.parrotBox);
+  }
+  // 屏幕归一化坐标 (u, v) 点中了哪个还没点着的火药桶（返回物理 id）。判定按包围盒外扩：手指点得粗也算
+  kegHit(u, v) {
+    if (this.director.mode !== 'play') return null;
+    this._ray.setFromCamera(this._ndc.set(u * 2 - 1, 1 - v * 2), this.camera);
+    const box = this._kegBox ??= new THREE.Box3();
+    for (const [id, m] of this.specials.meshes) {
+      if (m.userData.kind !== 'keg' || m.userData.fuse) continue;
+      box.setFromObject(m).expandByScalar(0.35);
+      if (this._ray.ray.intersectsBox(box)) return id;
+    }
+    return null;
   }
   // 羽毛 / 火花从鹦鹉身上迸出（互动反馈）
   parrotFX(kind) {

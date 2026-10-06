@@ -178,7 +178,8 @@ export class PusherPhysics {
   }
 
   // 爆炸：给半径内的物体一个向外向上的冲量（火药桶）
-  explode(x, y, z, radius, strength) {
+  // fwd：额外朝 +z（台面前沿）的推力比例，火药桶定向爆炸用
+  explode(x, y, z, radius, strength, fwd = 0) {
     let n = 0;
     for (const c of this.coins) {
       const p = c.body.translation();
@@ -187,7 +188,7 @@ export class PusherPhysics {
       if (d > radius) continue;
       const k = (1 - d / radius) * strength * c.body.mass();
       const inv = 1 / Math.max(0.3, d);
-      c.body.applyImpulse({ x: dx * inv * k * 0.8, y: k * (0.9 + this.rng() * 0.4), z: dz * inv * k * 0.8 }, true);
+      c.body.applyImpulse({ x: dx * inv * k * 0.8, y: k * (0.9 + this.rng() * 0.4), z: dz * inv * k * 0.8 + k * fwd }, true);
       c.body.applyTorqueImpulse({ x: (this.rng() - 0.5) * k * 0.1, y: 0, z: (this.rng() - 0.5) * k * 0.1 }, true);
       n++;
     }
@@ -314,6 +315,9 @@ export class PusherPhysics {
       c.prevQ.x = r.x; c.prevQ.y = r.y; c.prevQ.z = r.z; c.prevQ.w = r.w;
     }
   }
+
+  // 按对象移除（火药桶原地炸没）
+  removeObj(c) { const i = this.coins.indexOf(c); if (i >= 0) { c.out = 'gone'; this._remove(i); } }
 
   _remove(i) {
     const c = this.coins[i];

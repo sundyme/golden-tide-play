@@ -96,6 +96,10 @@ export class SpecialsView {
       m.userData.stars = stars;
     } else if (o.kind === 'keg') {
       m = this.kegModel.clone();
+      // 「可以点」的提示：桶顶一圈暖光呼吸（点着以后换成引信火花）
+      const hint = new THREE.Sprite(this.kegHintMat ??= new THREE.SpriteMaterial({ map: glowTexture(), color: new THREE.Color(0xffa040).multiplyScalar(0.9), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+      hint.position.y = 1.35; hint.scale.setScalar(1.1);
+      m.add(hint); m.userData.hint = hint;
     } else if (o.kind === 'map') {
       // 藏宝图碎片：终极目标物件，画面上放大 1.3 倍、羊皮纸压暖微亮 + 平贴台面向外扩散的金色波纹（在金币堆里一眼找到）
       m = new THREE.Group();
@@ -110,8 +114,20 @@ export class SpecialsView {
       m.add(paper, halo, ring);
       m.userData.paper = paper; m.userData.ring = ring; m.userData.halo = halo;
     }
+    m.userData.kind = o.kind;
     this.scene.add(m);
     return m;
+  }
+
+  // 火药桶点着：桶顶引信火花 + 红光，越接近爆炸闪得越快
+  light(id, fuse) {
+    const m = this.meshes.get(id); if (!m) return;
+    m.userData.fuse = { t0: performance.now() / 1000, dur: fuse };
+    if (m.userData.hint) m.userData.hint.visible = false;
+    const spark = new THREE.Sprite(this.sparkMat ??= new THREE.SpriteMaterial({ map: starTexture(), color: new THREE.Color(0xffe2a0).multiplyScalar(3), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: new THREE.Color(0xff3a1a).multiplyScalar(1.4), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+    spark.position.y = glow.position.y = 1.4;
+    m.add(glow, spark); m.userData.spark = spark; m.userData.fglow = glow;
   }
 
   update(objs, alpha) {
@@ -130,6 +146,14 @@ export class SpecialsView {
     // 动画：宝石闪点、藏宝图光环脉动 + 纸片轻微上下浮动（只动子网格，不影响物理）
     const t = performance.now() / 1000;
     for (const m of this.meshes.values()) {
+      if (m.userData.hint?.visible) { const k = 0.5 + 0.5 * Math.sin(t * 3.2); m.userData.hint.material.opacity = 0.35 + 0.5 * k; m.userData.hint.scale.setScalar(0.9 + 0.5 * k); }
+      if (m.userData.fuse) {
+        // 引信：火花抖动旋转；红光按「剩余时间」加速闪烁（最后 1 秒几乎常亮）
+        const F = m.userData.fuse, left = Math.max(0, F.dur - (t - F.t0)), rate = 3 + 14 * (1 - left / F.dur);
+        m.userData.spark.scale.setScalar(0.45 + 0.35 * Math.random()); m.userData.spark.material.rotation = t * 9;
+        const fl = 0.5 + 0.5 * Math.sin((t - F.t0) * rate * Math.PI);
+        m.userData.fglow.scale.setScalar(1.2 + 1.6 * fl); m.userData.fglow.material.opacity = 0.35 + 0.65 * fl;
+      }
       if (m.userData.stars) m.userData.stars.forEach(s => { const k = Math.max(0, Math.sin((t + s.userData.ph) * 4.2)); s.scale.setScalar(0.05 + 0.6 * k * k); });
       if (m.userData.ring) {
         // 波纹：每 1.4 秒从碎片下方扩散一圈，平贴在台面上（抵消碎片自身的倾斜）

@@ -61,7 +61,7 @@ async function boot() {
 
   let started = false, paused = false;
   let tut = null;
-  const persist = () => store.save({ game: game.serialize(), settings, best: { won: Math.max(best.won, game.won), endings: best.endings }, tut: tut?.saved ?? saved.tut });
+  const persist = () => store.save({ game: game.serialize(), settings, best: { won: Math.max(best.won, game.won), endings: best.endings, fastest: best.fastest, combo: best.combo }, tut: tut?.saved ?? saved.tut });
 
   const ui = new GameUI(frame, {
     start() {
@@ -90,6 +90,13 @@ async function boot() {
   tut.onChange = persist;
 
   game.on(e => {
+    // 终局卡：先和最佳纪录比（最快抵达 / 最高连击），UI 据此盖「新纪录」章
+    if (e.type === 'endingCard') {
+      e.record = { time: !(best.fastest <= e.time), combo: e.maxCombo > (best.combo ?? 0) };
+      if (e.record.time) best.fastest = Math.round(e.time);
+      if (e.record.combo) best.combo = e.maxCombo;
+      e.best = { ...best };
+    }
     view.onEvent(e, game);
     ui.onEvent(e, game, view);
     tut.onEvent(e);
@@ -113,17 +120,23 @@ async function boot() {
     const r = canvas.getBoundingClientRect();
     return view.parrotHit((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height);
   };
+  // 火药桶：点到台上还没点着的火药桶就点火，这一下不投币
+  const onKeg = ev => {
+    const r = canvas.getBoundingClientRect();
+    return view.kegHit((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height);
+  };
   canvas.addEventListener('pointermove', ev => {
     dropX = toDropX(ev);
     if (ev.pointerType === 'mouse' && !holding) {
       const on = started && !paused && onParrot(ev);
-      buddy.hover(on); canvas.style.cursor = on ? 'pointer' : '';
+      buddy.hover(on); canvas.style.cursor = on || (started && !paused && onKeg(ev) !== null) ? 'pointer' : '';
     }
   });
   canvas.addEventListener('pointerleave', () => { buddy.hover(false); canvas.style.cursor = ''; });
   canvas.addEventListener('pointerdown', ev => {
     if (!started || paused) return;
     if (onParrot(ev)) { buddy.poke(); if (ev.pointerType !== 'mouse') { buddy.hover(true); setTimeout(() => buddy.hover(false), 1200); } return; }
+    { const id = onKeg(ev); if (id !== null && game.lightKeg(id)) return; }
     canvas.setPointerCapture(ev.pointerId);
     dropX = toDropX(ev); holding = true; holdT = 0; game.drop(dropX);
   });

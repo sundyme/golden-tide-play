@@ -24,7 +24,7 @@ const HOWTO = `
   <div class="syms">
     ${sym('skull', '骷髅', 'JACKPOT：船炮金雨 + 金币瀑布')}
     ${sym('gem', '宝石', '落下大宝石，推下去得 20 枚')}
-    ${sym('keg', '火药桶', '推下前沿会爆炸，炸松一大片')}
+    ${sym('keg', '火药桶', '点它点火，3 秒后朝前沿炸开，还会崩出金币进宝箱')}
     ${sym('anchor', '船锚', '道具「金币雨」')}
     ${sym('parrot', '鹦鹉', '百搭；盘面 3 只以上送「护栏」')}
     ${sym('coins', '金币堆', '不连线，数个数：7 / 8 / 9 个 → +2 / +6 / +30 枚')}
@@ -93,11 +93,16 @@ export class GameUI {
       <div id="ending" class="screen scrim hide">
         <div class="card tall"><i class="frame"></i>${CREST}
           <h2 class="gold-text">抵达金币岛</h2>
+          <div class="stamp" id="e-stamp"></div>
           <div class="stats">
             <span>本局推落</span><b class="num" id="e-won">0</b>
             <span>投入金币</span><b class="num" id="e-spent">0</b>
             <span>航行时间</span><b class="num" id="e-time">0</b>
+            <span>最佳连击</span><b class="num" id="e-combo">0</b>
+            <span>Jackpot</span><b class="num" id="e-jp">0</b>
+            <span>亲手点火</span><b class="num" id="e-keg">0</b>
           </div>
+          <div class="best" id="e-best"></div>
           <div class="actions"><button class="btn-deco sm" id="btn-continue">继续航行</button></div>
         </div>
       </div>`;
@@ -225,26 +230,30 @@ export class GameUI {
         break;
       }
       case 'payout': if (e.value > 0 && view.director.mode === 'play') this._flyCoins(e.value, view);
-        if (e.value > 0) { this.popAcc.v += e.value; this.popAcc.big = this.popAcc.big || e.value >= 6; if (e.combo >= 5) this._comboPop(e.combo, view); } break;
+        if (e.value > 0) { this.popAcc.v += e.value; this.popAcc.big = this.popAcc.big || e.value >= 6; if (e.combo >= 5) this._comboPop(e.combo, view, game); } break;
       case 'refill': this.el.plaque.classList.remove('bump'); void this.el.plaque.offsetWidth; this.el.plaque.classList.add('bump'); break;
       case 'comboEnd': clearTimeout(this.comboHide); this.el.combo.classList.remove('on'); if (e.n >= 8 && view.director.mode === 'play') this.banner(`连击 ×${e.n}`, '', 'small', 1.2); break;
       case 'slotResult': {
         const wild = e.lines.some(l => l.wild) ? ' · 鹦鹉百搭' : '';
         const NAME = { gem: '宝石', keg: '火药桶', anchor: '船锚', parrot: '鹦鹉' };
-        const SUB = { gem: '大宝石落下 · 价值 20 枚', keg: '推下去就炸开前沿', anchor: '获得道具：金币雨', parrot: '获得道具：护栏' };
+        const SUB = { gem: '大宝石落下 · 价值 20 枚', keg: '点它点火 · 炸开前沿崩出金币', anchor: '获得道具：金币雨', parrot: '获得道具：护栏' };
         if (e.result === 'multi') this.banner(`${e.lines.length} 线连中！`, `获得道具：巨币 · +${e.bonus} 枚${wild}`, '', 2.2);
         else if (SUB[e.result]) this.banner(`${NAME[e.result]}连线！`, SUB[e.result] + wild, '', 1.8);
         else if (e.result === 'guard') this.banner(`${e.parrots} 只鹦鹉！`, '获得道具：护栏', 'small teal', 1.6);
         else if (e.result === 'coins9') this.banner('金潮满盘！', `九格金币 · +${e.coinPay} 枚`, 'big', 2.4);
         else if (e.result === 'coins') this.banner(`金币 ×${e.coins}`, `+${e.coinPay} 枚`, 'small', 1.1);
         if (e.result === 'gem') this.say('宝石！推它下去！', 2);
-        if (e.result === 'keg') this.say('当心！要炸啦！', 2);
+        if (e.result === 'keg') this.say('点一下火药桶，点火！', 2);
         if (e.result === 'coins9') this.say('满盘金币！嘎嘎！', 3);
         if (wild && e.result !== 'gem' && e.result !== 'keg') this.say('嘿嘿，我是百搭！', 2);
         break;
       }
       case 'itemGain': this.say(`拿到「${ITEM[e.item].name}」！点下面用！`, 2); break;
-      case 'kegBoom': this.say('轰——！嘎！', 3, 1.4); break;
+      case 'kegLit': if (!e.auto) { const p = view.tableScreen(e.x, e.z, 1.6); this.pop('点火！', p.x, p.y, 'spin'); this.say('点火！快躲开！', 3, 1.4); } else this.say('当心！要炸啦！', 2); break;
+      case 'kegBoom': { this.say('轰——！嘎！', 3, 1.4); const p = view.tableScreen(e.x, e.z, 1.2); this.pop(e.sea ? `崩回 ${e.bonus} 枚` : `崩出 ${e.bonus} 枚`, p.x, p.y, 'spin'); break; }
+      // 道具栏满：同一时刻老虎机结果横幅也会出，用道具栏上方的飘字说明（横幅会被覆盖）
+      case 'itemOverflow': { const c = this._center(this.el.slots[1]), cq = this.root.clientWidth / 100; setTimeout(() => this.pop(`道具栏满 · ${ITEM[e.item].name}直接发动`, c.x, c.y - 27 * cq, 'spin full'), 500); this.say('道具栏满啦，直接放！', 2); break; }
+      case 'spinStart': if (e.fast) { const p = view.spinScreen(), cq = this.root.clientWidth / 100; this.pop('快转', p.x + 9 * cq, p.y + 4 * cq, 'spin full'); } break;
       case 'surgeStart': {
         this.banner('大潮！', '台面前倾 · 推板加速', 'teal', 2);
         // 手里有道具：提醒趁大潮用（金币雨 / 护栏叠大潮收益接近翻倍），道具槽一起跳
@@ -267,6 +276,14 @@ export class GameUI {
         const m = Math.floor(e.time / 60), s = Math.floor(e.time % 60);
         this.root.querySelector('#e-won').textContent = e.won; this.root.querySelector('#e-spent').textContent = e.spent;
         this.root.querySelector('#e-time').textContent = `${m}:${String(s).padStart(2, '0')}`;
+        const q = id => this.root.querySelector(id), fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+        q('#e-combo').textContent = e.maxCombo ?? 0; q('#e-jp').textContent = e.jackpots ?? 0; q('#e-keg').textContent = e.kegsLit ?? 0;
+        // 印章：首航 / 新纪录（更快抵达或更高连击）
+        const first = !(e.best?.endings > 0), rec = e.record && (e.record.time || e.record.combo);
+        const st = q('#e-stamp'); st.className = 'stamp'; st.textContent = first ? '首航' : rec ? '新纪录' : '';
+        if (first || rec) requestAnimationFrame(() => st.classList.add('on'));
+        q('#e-best').textContent = first ? '' : `最快 ${fmt(e.best.fastest)} · 最高连击 ×${e.best.combo ?? 0}`;
+        if (rec && !first) this.say('新纪录！嘎！', 3);
         this.el.ending.classList.remove('hide');
         break;
       }
@@ -298,10 +315,11 @@ export class GameUI {
   }
 
   // 连击：固定在宝箱右上方的一个计数，原地刷新放大一下（以前每 5 连击新生成一个飘字，会叠在一起）
-  _comboPop(n, view) {
+  _comboPop(n, view, game) {
     if (view.director.mode !== 'play') return;
     const c = this.el.combo, p = view.chestScreen(), cq = this.root.clientWidth / 100;
-    c.innerHTML = `<span class="lbl">连击</span><b class="n gold-text"><small>×</small>${n}</b>`; c.classList.toggle('hot', n >= 15); c.style.left = (p.x + 22 * cq) + 'px'; c.style.top = (p.y - 20 * cq) + 'px';
+    const tide = n >= game.cfg.tide.comboTideFrom;   // 连击 ≥ 10：在给大潮充能，徽章右边亮一个浪花
+    c.innerHTML = `<span class="lbl">连击</span><b class="n gold-text"><small>×</small>${n}</b>${tide ? '<i class="tide" title="连击在给大潮充能">〰</i>' : ''}`; c.classList.toggle('hot', n >= 15); c.style.left = (p.x + 22 * cq) + 'px'; c.style.top = (p.y - 20 * cq) + 'px';
     c.classList.add('on'); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
     clearTimeout(this.comboHide); this.comboHide = setTimeout(() => c.classList.remove('on'), 1600);
   }

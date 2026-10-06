@@ -38,6 +38,7 @@ export class Game {
     this.items = [];                 // 'coinrain' | 'guard' | 'giant'
     this.mapPieces = 0; this.mapOnTable = 0; this.nextMapT = config.map.firstAt;
     this.combo = 0; this.comboT = 0;
+    this.voyage = { t0: 0, maxCombo: 0, jackpots: 0, kegsLit: 0 };   // 本次航行（到金币岛为止）的战绩，终局卡用
     this.slot = { queue: 0, state: 'idle', t: 0, result: null, grid: [['coins', 'skull', 'coins'], ['gem', 'coins', 'anchor'], ['coins', 'parrot', 'coins']], stops: [] };
     this.jackpot = null; this.ending = null;
     this.timeScale = 1;
@@ -127,6 +128,7 @@ export class Game {
 
     this._updateSlot(dt);
     this._updateMap();
+    this._updateKegs();
   }
 
   // ---------- 物理事件 ----------
@@ -143,28 +145,81 @@ export class Game {
     const obj = e.obj, front = e.kind === 'front';
     if (front) {
       let v = this.cfg.payout[obj] ?? 0;
-      if (obj === 'keg') this._kegBoom(e.x);
+      if (obj === 'keg') this._kegBoom(e.x, e.coin);
       if (obj === 'map') { this.mapPieces++; this.mapOnTable--; this.stats.maps++; this.emit('mapCollected', { n: this.mapPieces }); if (this.mapPieces >= this.cfg.map.pieces) this.after(1.2, () => this._startEnding()); }
       if (obj === 'gem') this.stats.gems++;
       if (v > 0) {
         this.wallet += v; this.won += v;
         this.stats.payoutBySource[obj] = (this.stats.payoutBySource[obj] || 0) + v;
         this.combo++; this.comboT = this.cfg.play.comboWindow;
+        if (this.combo >= this.cfg.tide.comboTideFrom) this._addTide(this.cfg.tide.perCombo);   // 连击给大潮充能
+        if (this.combo > this.voyage.maxCombo) this.voyage.maxCombo = this.combo;
       }
       this.emit('payout', { obj, value: v, x: e.x, combo: this.combo, coin: e.coin });
     } else {
       if (obj === 'coin' || obj === 'giant') this.lost++;
+      if (obj === 'keg') this._kegSeaBoom(e.x, e.z);
       if (obj === 'map') { this.mapOnTable--; this.stats.mapsLost++; this.nextMapT = Math.min(this.nextMapT, this.time + this.cfg.map.respawnAfterLost); }
       this.emit('lost', { obj, x: e.x, coin: e.coin });
     }
   }
 
-  _kegBoom(x) {
+  // ---------- 火药桶 ----------
+  // 点火（玩家点到台上的火药桶）；成功返回 true
+  lightKeg(id, auto = false) {
+    const c = this.sim.coins.find(o => o.id === id && o.kind === 'keg' && !o.out);
+    if (!c || c.fuseAt || this.ending?.lock) return false;
+    c.fuseAt = this.time + this.cfg.specials.kegFuse;
+    if (!auto) { this.stats.kegLit = (this.stats.kegLit || 0) + 1; this.voyage.kegsLit++; }
+    const p = c.body.translation();
+    this.emit('kegLit', { id, auto, x: p.x, z: p.z, fuse: this.cfg.specials.kegFuse });
+    return true;
+  }
+
+  _updateKegs() {
+    const S = this.cfg.specials, M = this.cfg.machine;
+    for (const c of this.sim.coins) {
+      if (c.kind !== 'keg' || c.out) continue;
+      if (!c.fuseAt) { if (c.body.translation().z > M.tableFrontZ - S.kegAutoLightZ) this.lightKeg(c.id, true); continue; }
+      if (this.time < c.fuseAt) continue;
+      // 引信烧完：在原地朝前沿定向爆炸，火药桶本身炸没
+      const p = c.body.translation(), at = { x: p.x, y: Math.max(0.3, p.y), z: p.z };
+      this.sim.removeObj(c);
+      this.stats.kegBooms++;
+      const n = this.sim.explode(at.x, at.y, at.z, S.kegBlastRadius, S.kegBlastStrength, S.kegBlastForward);
+      this._kegCoins(at, S.kegBonus);
+      this.emit('kegBoom', { ...at, n, bonus: S.kegBonus, id: c.id });
+    }
+  }
+
+  // 没炸就被推下前沿：在台边炸开（和以前一样），也崩出奖励金币
+  _kegBoom(x, c) {
     const M = this.cfg.machine, S = this.cfg.specials;
     this.stats.kegBooms++;
     const p = { x: Math.max(-M.width / 2 + 1, Math.min(M.width / 2 - 1, x)), y: 0.3, z: M.tableFrontZ - 0.9 };
-    const n = this.sim.explode(p.x, p.y, p.z, S.kegBlastRadius, S.kegBlastStrength);
-    this.emit('kegBoom', { ...p, n });
+    const n = this.sim.explode(p.x, p.y, p.z, S.kegBlastRadius, S.kegBlastStrength, S.kegBlastForward);
+    this._kegCoins({ x: p.x, y: 0.6, z: M.tableFrontZ - 0.3 }, S.kegBonus);
+    this.emit('kegBoom', { ...p, n, bonus: S.kegBonus, id: c?.id });
+  }
+
+  // 从侧面掉海：半空炸开，崩回几枚金币进宝箱（不再白掉）
+  _kegSeaBoom(x, z) {
+    const S = this.cfg.specials;
+    this.stats.kegBooms++;
+    const at = { x, y: -0.4, z };
+    this._kegCoins(at, S.kegSeaBonus);
+    this.emit('kegBoom', { ...at, n: 0, bonus: S.kegSeaBonus, sea: true });
+  }
+
+  // 崩出的金币：抛物线飞进收币宝箱（真实物理币，落进宝箱照常计入进账和连击）
+  _kegCoins(at, n) {
+    const M = this.cfg.machine, chestZ = M.tableFrontZ + 2.3;
+    for (let k = 0; k < n; k++) this.after(0.03 * k, () => {
+      const to = { x: (this.rng() * 2 - 1) * 1.6, y: -0.6, z: chestZ + (this.rng() - 0.5) * 1.2 };
+      const from = { x: at.x + (this.rng() - 0.5) * 0.6, y: at.y + 0.3, z: at.z };
+      const v = ballistic(from, to, 0.7 + this.rng() * 0.25, this.cfg.physics.gravity);
+      this.sim.spawn('coin', from.x, from.y, from.z, { vel: v, fly: 1.2, angvel: { x: this.rng() * 20 - 10, y: 0, z: this.rng() * 20 - 10 } });
+    });
   }
 
   _addTide(v) {
@@ -222,16 +277,18 @@ export class Game {
     const S = this.slot, C = this.cfg.slot;
     if (S.state === 'idle') {
       if (S.queue > 0 && !this.jackpot && !this.ending) {
+        const fast = S.queue >= C.fastQueue;   // 攒着的次数多：这一转快停
         S.queue--;
         const forced = this.forceResult; this.forceResult = null;
         S.grid = forced ? this._forcedGrid(forced) : this._rollGrid();
         S.eval = evaluateGrid(S.grid);
         const tease = this._tease(S.grid);
-        S.stops = [C.stop1, C.stop2, C.stop3 + (tease ? C.tease : 0)];
-        S.t = 0; S.state = 'spin'; S.stopped = 0;
+        const k = fast ? C.fastK : 1;
+        S.stops = [C.stop1 * k, C.stop2 * k, C.stop3 * k + (tease ? C.tease : 0)];
+        S.t = 0; S.state = 'spin'; S.stopped = 0; S.fast = fast;
         this.stats.spins++;
         if (!this.ending) this.nextMapT -= this.cfg.map.spinAdvance;   // 开转越多，下一片藏宝图来得越早
-        this.emit('spinStart', { grid: S.grid, stops: S.stops, queue: S.queue, tease });
+        this.emit('spinStart', { grid: S.grid, stops: S.stops, queue: S.queue, tease, fast });
       }
       return;
     }
@@ -242,14 +299,14 @@ export class Game {
         S.stopped++;
       }
       if (S.stopped === 3) { S.state = 'show'; S.t = 0; this._resolve(S.eval); }
-    } else if (S.state === 'show' && S.t >= C.showSeconds) S.state = 'idle';
+    } else if (S.state === 'show' && S.t >= C.showSeconds * (S.fast ? C.fastK : 1)) S.state = 'idle';
   }
 
   _resolve(ev) {
     const C = this.cfg.slot, T = this.cfg.tide, M = this.cfg.machine;
     const giveItem = it => {
       if (this.items.length < this.cfg.items.max) { this.items.push(it); this.emit('itemGain', { item: it, slot: this.items.length - 1 }); }
-      else this.useItem(0) && this.items.push(it);   // 道具栏满：自动用掉最早的，新道具入栏
+      else { this.items.push(it); this.useItem(this.items.length - 1); this.emit('itemOverflow', { item: it }); }   // 道具栏满：新道具直接发动，攒着的不动（以前会偷偷用掉最早那个）
     };
     // 老虎机发币：小额（+2）还从投币口落；6 枚以上（金币堆 8 格、金潮满盘、多线奖励）由船炮打上台面，
     // 落点仍在上层台面（和投币口落币差不多远），不改变推落节奏
@@ -284,7 +341,7 @@ export class Game {
   // ---------- Jackpot ----------
   _startJackpot() {
     const J = this.cfg.jackpot, M = this.cfg.machine;
-    this.stats.jackpots++;
+    this.stats.jackpots++; this.voyage.jackpots++;
     this.jackpot = { t0: this.time };
     this.timeScale = J.slowmo;
     this.emit('jackpotStart');
@@ -358,12 +415,13 @@ export class Game {
       });
       this.emit('chestPour');
     });
-    this.after(E.sailSeconds + E.chestTipDelay + E.cardDelay, () => this.emit('endingCard', { won: this.won, spent: this.spent, time: this.time }));
+    this.after(E.sailSeconds + E.chestTipDelay + E.cardDelay, () => this.emit('endingCard', { won: this.won, spent: this.spent, time: this.time - this.voyage.t0, ...this.voyage }));
   }
 
   // 结局卡关闭后继续玩：藏宝图重置
   continueAfterEnding() {
     this.ending = null; this.mapPieces = 0; this.nextMapT = this.time + this.cfg.map.firstAt;
+    this.voyage = { t0: this.time, maxCombo: 0, jackpots: 0, kegsLit: 0 };
     this.emit('endingDone');
   }
 

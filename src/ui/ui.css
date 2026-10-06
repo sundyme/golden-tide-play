@@ -255,3 +255,15 @@
 #combo.on { opacity: 1; }
 #combo.bump .n { animation: combobump .32s cubic-bezier(.3, 1.8, .5, 1); }
 @keyframes combobump { from { scale: 1.45; } }
+
+/* 终局卡：首航 / 新纪录印章（珊瑚红圆章斜盖在卡片右上角，落下时砸一下）+ 最佳纪录小字 */
+#ending .card { position: relative; }
+#ending .stamp { position: absolute; top: -5cqw; right: -3cqw; width: 16cqw; height: 16cqw; z-index: 2; border-radius: 50%; display: grid; place-items: center; font: 4.2cqw "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: .1em; color: #ffe2d6; filter: drop-shadow(0 .8cqw 1.2cqw #000a); background: radial-gradient(circle, #d8452f 0 58%, transparent 59%), radial-gradient(circle, transparent 0 63%, #d8452f 64% 70%, transparent 71%); box-shadow: 0 0 0 .4cqw #ffffff22 inset; opacity: 0; transform: rotate(-16deg) scale(2.2); pointer-events: none; }
+#ending .stamp:empty { display: none; }
+#ending .stamp.on { animation: stampin .42s cubic-bezier(.5, 0, .7, 1) .5s forwards; }
+@keyframes stampin { 0% { opacity: 0; transform: rotate(-16deg) scale(2.2); } 70% { opacity: 1; transform: rotate(-16deg) scale(.92); } 100% { opacity: .92; transform: rotate(-16deg) scale(1); } }
+#ending .best { font-size: 3.4cqw; color: #9fb3c6; letter-spacing: .06em; margin-bottom: 2cqw; min-height: 1em; }
+#ending .stats { row-gap: 1.1cqw; font-size: 4.2cqw; }
+/* 连击徽章上的浪花：连击在给大潮充能 */
+#combo .tide { font-style: normal; font-size: 4.2cqw; color: #5fe3f0; text-shadow: 0 0 1.6cqw #5fe3f0aa; margin-left: .2cqw; animation: tidebob 1s ease-in-out infinite; }
+@keyframes tidebob { 50% { transform: translateY(-.5cqw); } }

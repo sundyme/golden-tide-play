@@ -63,6 +63,9 @@ export const CONFIG = {
     gemRadius: 0.62, gemDensity: 5.0,
     kegRadius: 0.5, kegHalfHeight: 0.62, kegDensity: 0.9,
     kegBlastRadius: 3.2, kegBlastStrength: 9,
+    // 火药桶点火：玩家点一下 → 引信 kegFuse 秒后在原地朝前沿定向爆炸，并崩出 kegBonus 枚金币飞进宝箱；
+    // 没人点、推到离前沿 kegAutoLightZ 以内自动点燃；从侧面掉海时半空炸开，崩回 kegSeaBonus 枚
+    kegFuse: 3, kegAutoLightZ: 1.4, kegBlastForward: 0.6, kegBonus: 6, kegSeaBonus: 3,
     mapSize: [1.3, 1.0], mapDensity: 1.2,
   },
 
@@ -92,6 +95,8 @@ export const CONFIG = {
     perGate: 0.004,          // 穿过骷髅门
     perPair: 0.012,          // 老虎机小奖（金币散布 / 三鹦鹉）
     perTriple: 0.03,         // 老虎机每条连线
+    perCombo: 0.0015,        // 连击 ≥ comboTideFrom 后，每多推落一枚
+    comboTideFrom: 10,
   },
 
   // 老虎机：3×3 九宫格，5 条线（3 横 + 2 斜）。每格独立按下表抽符号（公开的概率，合计 1）。
@@ -103,11 +108,12 @@ export const CONFIG = {
   // 蒙特卡洛（30 万转）：Jackpot 0.82% · 宝石 1.75% · 火药桶 1.94% · 金币雨 1.54% · 护栏 2.1% · 多线 0.4% · 金币奖 25%
   slot: {
     cells: { skull: 0.056, gem: 0.101, keg: 0.104, anchor: 0.097, parrot: 0.078, coins: 0.564 },
-    coinPay: { 7: 2, 8: 6, 9: 30 },
+    coinPay: { 7: 1, 8: 6, 9: 30 },   // 7 格 2 → 1：抵消「攒多了转轮加速」带来的转数增加
     parrotGuard: 3,
     multiBonus: 10,
     maxQueue: 3,
     stop1: 0.9, stop2: 1.3, stop3: 1.7, tease: 0.8, showSeconds: 0.9,
+    fastQueue: 2, fastK: 0.75,   // 开转时待转（含这一次）≥ fastQueue：停轮和展示时间 × fastK（瞄得准的玩家不再被「最多攒 3 次」卡死；慢停悬念保留）
   },
 
   items: { max: 3, coinRain: 22, guardSeconds: 20 },
