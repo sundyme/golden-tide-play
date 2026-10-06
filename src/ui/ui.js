@@ -1,5 +1,7 @@
 // UI 层：钱包木牌、藏宝图进度、道具栏、横幅、飘字、鹦鹉气泡、开始 / 设置 / 结局卷轴。
 // 只订阅游戏事件 + 每帧读取少量状态；操作通过 handlers 回调交给 main。
+import { BOUNTY_BY_KEY } from '../gameplay/bounties.js';
+
 const UI = './public/assets/ui/';
 const ITEM = {
   coinrain: { img: 'pw_coinrain.webp', name: '金币雨' },
@@ -38,8 +40,10 @@ const HOWTO = `
   </div>
   <h3>大潮</h3>
   <p>投币、过门、中奖都会涨潮，涨满了掀起<b>大潮</b>：台面前倾、推板加速 10 秒，是推落的好时机。</p>
+  <h3>悬赏令</h3>
+  <p>每次航行有 3 条悬赏（简单 / 中等 / 困难），点右上角「悬赏」查看。完成就盖章：简单 +20 枚、中等送一个道具、困难 +60 枚。</p>
   <h3>其它</h3>
-  <p>没币了每 4 秒补 1 枚。鹦鹉铜板会给你出主意，戳够了还会吐几枚私房钱。游戏内金币为虚拟道具，不可兑换。</p>`;
+  <p>钱包不到 20 枚时每 4 秒补 1 枚。连击 10 以上会给大潮充能。鹦鹉铜板会给你出主意，戳够了还会吐几枚私房钱。游戏内金币为虚拟道具，不可兑换。</p>`;
 
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); Object.assign(e, attrs); if (html) e.innerHTML = html; return e; };
 
@@ -57,6 +61,8 @@ export class GameUI {
       <div id="maps" class="enamel sheen">${'<i></i>'.repeat(5)}</div>
       <div id="maps-label">藏宝图</div>
       <button id="btn-settings" class="icon-btn enamel" aria-label="设置">${GEAR}</button>
+      <button id="btn-bounty" class="enamel" aria-label="悬赏令"><img src="${UI}icon_bounty.webp" alt=""><b>悬赏</b><span class="num">0/3</span></button>
+      <div id="btoast"><i class="seal"></i><div><b>悬赏完成</b><span></span></div><em class="num"></em></div>
       <div id="chips"></div>
       <div id="spins" class="enamel"><b>待转</b><i></i><i></i><i></i></div>
       <div id="items">${[0, 1, 2].map(i => `<button class="slot enamel" data-i="${i}" aria-label="道具"><img alt=""><span class="lbl"></span></button>`).join('')}</div>
@@ -83,6 +89,14 @@ export class GameUI {
           <div class="actions"><button class="btn-deco sm" id="btn-close">继续</button></div>
         </div>
       </div>
+      <div id="bounty" class="screen scrim hide">
+        <div class="card tall"><i class="frame"></i>${CREST}
+          <h2 class="gold-text">悬赏令</h2>
+          <div class="bsub">本次航行 · 完成就盖章领赏</div>
+          <div class="blist"></div>
+          <div class="actions"><button class="btn-deco sm" id="btn-bounty-close">继续航行</button></div>
+        </div>
+      </div>
       <div id="howto" class="screen scrim hide">
         <div class="card tall"><i class="frame"></i>${CREST}
           <h2 class="gold-text">玩法</h2>
@@ -101,6 +115,7 @@ export class GameUI {
             <span>最佳连击</span><b class="num" id="e-combo">0</b>
             <span>Jackpot</span><b class="num" id="e-jp">0</b>
             <span>亲手点火</span><b class="num" id="e-keg">0</b>
+            <span>悬赏完成</span><b class="num" id="e-bounty">0/3</b>
           </div>
           <div class="best" id="e-best"></div>
           <div class="actions"><button class="btn-deco sm" id="btn-continue">继续航行</button></div>
@@ -118,6 +133,8 @@ export class GameUI {
     $('#btn-start').addEventListener('click', () => handlers.start());
     for (const b of [$('#btn-settings'), $('#btn-settings2')]) b.addEventListener('click', e => { e.stopPropagation(); this.openSettings(true); });
     $('#btn-close').addEventListener('click', () => this.openSettings(false));
+    $('#btn-bounty').addEventListener('click', e => { e.stopPropagation(); this.openBounty(true); });
+    $('#btn-bounty-close').addEventListener('click', () => this.openBounty(false));
     $('#btn-howto').addEventListener('click', () => { this.el.settings.classList.add('hide'); $('#howto').classList.remove('hide'); $('#howto .howto-body').scrollTop = 0; });
     $('#btn-howto-close').addEventListener('click', () => { $('#howto').classList.add('hide'); this.el.settings.classList.remove('hide'); });
     $('#btn-retut').addEventListener('click', () => { this.openSettings(false); handlers.replayTutorial?.(); });
@@ -131,8 +148,28 @@ export class GameUI {
 
   // ---------- 屏幕 ----------
   showStart(best) { if (best) this.el.best.textContent = `最佳：推落 ${best.won} 枚 · 抵达金币岛 ${best.endings} 次`; }
-  hideStart() { this.root.classList.remove('prestart'); this.el.start.classList.add('hide'); setTimeout(() => this.el.start.remove(), 700); this.started = true; this.hintAt = performance.now() + 1500; }
+  hideStart() { this.root.querySelector('#btn-bounty').classList.add('new'); this.root.classList.remove('prestart'); this.el.start.classList.add('hide'); setTimeout(() => this.el.start.remove(), 700); this.started = true; this.hintAt = performance.now() + 1500; }
   openSettings(on) { this.el.settings.classList.toggle('hide', !on); this.H.pause(on); }
+  // 悬赏令面板：打开时暂停（和设置一样）
+  openBounty(on) {
+    const el = this.root.querySelector('#bounty');
+    if (on) { this._renderBounty(); this.root.querySelector('#btn-bounty').classList.remove('new'); }
+    el.classList.toggle('hide', !on); this.H.pause(on);
+  }
+  _renderBounty() {
+    const g = this.g; if (!g) return;
+    const R = g.cfg.bounty.rewards, TIER = ['简单', '中等', '困难'];
+    const rewardText = r => r.coins ? `+${r.coins} 枚` : '道具一个';
+    this.root.querySelector('#bounty .blist').innerHTML = g.bounties.list.map(b => {
+      const d = BOUNTY_BY_KEY[b.key];
+      return `<div class="brow t${d.tier}${b.done ? ' done' : ''}">
+        <img class="tier" src="${UI}tier${d.tier + 1}.webp" alt="${TIER[d.tier]}" title="${TIER[d.tier]}">
+        <div class="btext"><b>${d.text(b.goal)}</b><span class="bar"><i style="width:${(b.n / b.goal * 100).toFixed(0)}%"></i></span></div>
+        <div class="bside"><em class="num">${b.done ? '' : `${b.n}/${b.goal}`}</em><small>${rewardText(R[d.tier])}</small></div>
+        ${b.done ? '<i class="bstamp">已领</i>' : ''}
+      </div>`;
+    }).join('');
+  }
   syncSettings(s) {
     for (const seg of this.root.querySelectorAll('.seg')) {
       const v = s[seg.dataset.k];
@@ -188,8 +225,9 @@ export class GameUI {
   // 元素中心（相对 UI 根节点）
   _center(el) { const r = this.root.getBoundingClientRect(), b = el.getBoundingClientRect(); return { x: b.left + b.width / 2 - r.left, y: b.top + b.height / 2 - r.top }; }
 
-  pop(text, x, y, cls = '') {
+  pop(text, x, y, cls = '', icon = '') {
     const p = h('div', { className: `pop num gold-text ${cls}` }, text);
+    if (icon) p.prepend(h('img', { className: 'pi', src: UI + icon, alt: '' }));   // 飘字前的小图标（点火 / 快转）
     p.style.left = x + 'px'; p.style.top = y + 'px';
     this.el.pops.append(p);
     setTimeout(() => p.remove(), 1150);
@@ -249,11 +287,23 @@ export class GameUI {
         break;
       }
       case 'itemGain': this.say(`拿到「${ITEM[e.item].name}」！点下面用！`, 2); break;
-      case 'kegLit': if (!e.auto) { const p = view.tableScreen(e.x, e.z, 1.6); this.pop('点火！', p.x, p.y, 'spin'); this.say('点火！快躲开！', 3, 1.4); } else this.say('当心！要炸啦！', 2); break;
+      case 'kegLit': if (!e.auto) { const p = view.tableScreen(e.x, e.z, 1.6); this.pop('点火！', p.x, p.y, 'spin', 'fx_fuse.webp'); this.say('点火！快躲开！', 3, 1.4); } else this.say('当心！要炸啦！', 2); break;
       case 'kegBoom': { this.say('轰——！嘎！', 3, 1.4); const p = view.tableScreen(e.x, e.z, 1.2); this.pop(e.sea ? `崩回 ${e.bonus} 枚` : `崩出 ${e.bonus} 枚`, p.x, p.y, 'spin'); break; }
       // 道具栏满：同一时刻老虎机结果横幅也会出，用道具栏上方的飘字说明（横幅会被覆盖）
+      case 'bountyDone': {
+        const d = BOUNTY_BY_KEY[e.key], t = this.root.querySelector('#btoast');
+        t.querySelector('span').textContent = d.text(game.bounties.list[e.i].goal);
+        t.querySelector('em').textContent = e.reward.coins ? `+${e.reward.coins}` : ITEM[e.reward.item].name;
+        t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
+        clearTimeout(this.btoastT); this.btoastT = setTimeout(() => t.classList.remove('on'), 3200);
+        const b = this.root.querySelector('#btn-bounty'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump');
+        if (e.reward.coins) setTimeout(() => { const c = this._center(t.querySelector('em')); this._burst(c.x, c.y, 12, '#ffd36a', 60); }, 350);
+        this.say('悬赏完成！嘎！', 3);
+        break;
+      }
+      case 'bountiesNew': this.root.querySelector('#btn-bounty').classList.add('new'); this.say('新的悬赏令来啦！', 2); break;
       case 'itemOverflow': { const c = this._center(this.el.slots[1]), cq = this.root.clientWidth / 100; setTimeout(() => this.pop(`道具栏满 · ${ITEM[e.item].name}直接发动`, c.x, c.y - 27 * cq, 'spin full'), 500); this.say('道具栏满啦，直接放！', 2); break; }
-      case 'spinStart': if (e.fast) { const p = view.spinScreen(), cq = this.root.clientWidth / 100; this.pop('快转', p.x + 9 * cq, p.y + 4 * cq, 'spin full'); } break;
+      case 'spinStart': if (e.fast) { const p = view.spinScreen(), cq = this.root.clientWidth / 100; this.pop('快转', p.x + 9 * cq, p.y + 4 * cq, 'spin full', 'fx_fast.webp'); } break;
       case 'surgeStart': {
         this.banner('大潮！', '台面前倾 · 推板加速', 'teal', 2);
         // 手里有道具：提醒趁大潮用（金币雨 / 护栏叠大潮收益接近翻倍），道具槽一起跳
@@ -277,10 +327,10 @@ export class GameUI {
         this.root.querySelector('#e-won').textContent = e.won; this.root.querySelector('#e-spent').textContent = e.spent;
         this.root.querySelector('#e-time').textContent = `${m}:${String(s).padStart(2, '0')}`;
         const q = id => this.root.querySelector(id), fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-        q('#e-combo').textContent = e.maxCombo ?? 0; q('#e-jp').textContent = e.jackpots ?? 0; q('#e-keg').textContent = e.kegsLit ?? 0;
+        q('#e-combo').textContent = e.maxCombo ?? 0; q('#e-jp').textContent = e.jackpots ?? 0; q('#e-keg').textContent = e.kegsLit ?? 0; q('#e-bounty').textContent = `${e.bounties ?? 0}/3`;
         // 印章：首航 / 新纪录（更快抵达或更高连击）
         const first = !(e.best?.endings > 0), rec = e.record && (e.record.time || e.record.combo);
-        const st = q('#e-stamp'); st.className = 'stamp'; st.textContent = first ? '首航' : rec ? '新纪录' : '';
+        const st = q('#e-stamp'); st.className = 'stamp'; st.textContent = first ? '首航' : rec ? '新纪录' : ''; st.classList.toggle('long', st.textContent.length > 2);
         if (first || rec) requestAnimationFrame(() => st.classList.add('on'));
         q('#e-best').textContent = first ? '' : `最快 ${fmt(e.best.fastest)} · 最高连击 ×${e.best.combo ?? 0}`;
         if (rec && !first) this.say('新纪录！嘎！', 3);
@@ -319,13 +369,15 @@ export class GameUI {
     if (view.director.mode !== 'play') return;
     const c = this.el.combo, p = view.chestScreen(), cq = this.root.clientWidth / 100;
     const tide = n >= game.cfg.tide.comboTideFrom;   // 连击 ≥ 10：在给大潮充能，徽章右边亮一个浪花
-    c.innerHTML = `<span class="lbl">连击</span><b class="n gold-text"><small>×</small>${n}</b>${tide ? '<i class="tide" title="连击在给大潮充能">〰</i>' : ''}`; c.classList.toggle('hot', n >= 15); c.style.left = (p.x + 22 * cq) + 'px'; c.style.top = (p.y - 20 * cq) + 'px';
+    c.innerHTML = `<span class="lbl">连击</span><b class="n gold-text"><small>×</small>${n}</b>${tide ? `<img class="tide" src="${UI}fx_tide.webp" alt="" title="连击在给大潮充能">` : ''}`; c.classList.toggle('hot', n >= 15); c.style.left = (p.x + 22 * cq) + 'px'; c.style.top = (p.y - 20 * cq) + 'px';
     c.classList.add('on'); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
     clearTimeout(this.comboHide); this.comboHide = setTimeout(() => c.classList.remove('on'), 1600);
   }
 
   // ---------- 每帧 ----------
   update(dt, game, view) {
+    this.g = game;
+    { const n = game.bounties.doneCount, b = this.el.bountyN ??= this.root.querySelector('#btn-bounty span'); if (b.textContent !== `${n}/3`) b.textContent = `${n}/3`; }
     // 钱包数字滚动
     const w = game.wallet - this.inFlight;
     if (w !== this.shown.wallet) {

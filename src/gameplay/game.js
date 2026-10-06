@@ -2,11 +2,13 @@
 // 浏览器与无头机器人（tools/bot.mjs）共用。每个物理步调用一次 update(dt)，全部计时用游戏时间。
 // 表现层（画面 / 音频 / UI）只订阅这里发出的事件，不反向修改规则。
 import { mulberry32 } from '../physics/pusher.js';
+import { BountyBoard, BOUNTY_BY_KEY } from './bounties.js';
 
 export const SYMBOLS = ['skull', 'gem', 'keg', 'anchor', 'parrot', 'coins'];
 // 九宫格坐标 grid[列][行]（行 0 = 上）；5 条线：上 / 中 / 下 / 左上→右下 / 左下→右上
 export const LINES = [[[0, 0], [1, 0], [2, 0]], [[0, 1], [1, 1], [2, 1]], [[0, 2], [1, 2], [2, 2]], [[0, 0], [1, 1], [2, 2]], [[0, 2], [1, 1], [2, 0]]];
 const WILD = 'parrot', SCATTER = 'coins';
+const BOUNTY_TIER = new Proxy({}, { get: (_, k) => BOUNTY_BY_KEY[k].tier });
 
 // 一条线的结果：三格（百搭可替代）同为某符号 → 该符号；含金币堆或不成线 → null
 export function lineSymbol(cells) {
@@ -47,6 +49,7 @@ export class Game {
     this.listeners = [];
     this.scheduled = [];             // [{ t, fn }]
     sim.on(e => this._onPhysics(e));
+    this.bounties = new BountyBoard(this);   // 悬赏令（订阅本对象的事件）
   }
 
   on(fn) { this.listeners.push(fn); }
@@ -76,7 +79,7 @@ export class Game {
     return true;
   }
 
-  useItem(i, x = 0) {
+  useItem(i, x = 0, auto = false) {
     const it = this.items[i];
     if (!it) return false;
     this.items.splice(i, 1);
@@ -91,7 +94,7 @@ export class Game {
     } else if (it === 'giant') {
       this.sim.dropSpecial('giant', x);
     }
-    this.emit('itemUse', { item: it, x });
+    this.emit('itemUse', { item: it, x, auto });
     return true;
   }
 
@@ -162,6 +165,21 @@ export class Game {
       if (obj === 'map') { this.mapOnTable--; this.stats.mapsLost++; this.nextMapT = Math.min(this.nextMapT, this.time + this.cfg.map.respawnAfterLost); }
       this.emit('lost', { obj, x: e.x, coin: e.coin });
     }
+  }
+
+  _giveItem(it) {
+    if (this.items.length < this.cfg.items.max) { this.items.push(it); this.emit('itemGain', { item: it, slot: this.items.length - 1 }); }
+    else { this.items.push(it); this.useItem(this.items.length - 1, 0, true); this.emit('itemOverflow', { item: it }); }   // 道具栏满：新道具直接发动，攒着的不动（以前会偷偷用掉最早那个）
+  }
+
+  // 悬赏完成：按档发奖（简单 / 困难给金币直接进钱包，中等给一个道具）
+  _bountyReward(i, b) {
+    const R = this.cfg.bounty.rewards[BOUNTY_TIER[b.key]];
+    let reward;
+    if (R.coins) { this.wallet += R.coins; this.bonus += R.coins; reward = { coins: R.coins }; }
+    else { const it = this.rng() < 0.5 ? 'coinrain' : 'guard'; reward = { item: it }; this.after(1.2, () => this._giveItem(it)); }   // 道具晚一点到，先让印章盖完
+    this.stats.bounties = (this.stats.bounties || 0) + 1;
+    this.emit('bountyDone', { i, key: b.key, reward });
   }
 
   // ---------- 火药桶 ----------
@@ -304,10 +322,7 @@ export class Game {
 
   _resolve(ev) {
     const C = this.cfg.slot, T = this.cfg.tide, M = this.cfg.machine;
-    const giveItem = it => {
-      if (this.items.length < this.cfg.items.max) { this.items.push(it); this.emit('itemGain', { item: it, slot: this.items.length - 1 }); }
-      else { this.items.push(it); this.useItem(this.items.length - 1); this.emit('itemOverflow', { item: it }); }   // 道具栏满：新道具直接发动，攒着的不动（以前会偷偷用掉最早那个）
-    };
+    const giveItem = it => this._giveItem(it);
     // 老虎机发币：小额（+2）还从投币口落；6 枚以上（金币堆 8 格、金潮满盘、多线奖励）由船炮打上台面，
     // 落点仍在上层台面（和投币口落币差不多远），不改变推落节奏
     const dropCoins = n => {
@@ -415,13 +430,14 @@ export class Game {
       });
       this.emit('chestPour');
     });
-    this.after(E.sailSeconds + E.chestTipDelay + E.cardDelay, () => this.emit('endingCard', { won: this.won, spent: this.spent, time: this.time - this.voyage.t0, ...this.voyage }));
+    this.after(E.sailSeconds + E.chestTipDelay + E.cardDelay, () => this.emit('endingCard', { won: this.won, spent: this.spent, time: this.time - this.voyage.t0, ...this.voyage, bounties: this.bounties.doneCount }));
   }
 
   // 结局卡关闭后继续玩：藏宝图重置
   continueAfterEnding() {
     this.ending = null; this.mapPieces = 0; this.nextMapT = this.time + this.cfg.map.firstAt;
     this.voyage = { t0: this.time, maxCombo: 0, jackpots: 0, kegsLit: 0 };
+    this.bounties.reset(); this.emit('bountiesNew');
     this.emit('endingDone');
   }
 
@@ -441,11 +457,12 @@ export class Game {
 
   // ---------- 存档 ----------
   serialize() {
-    return { v: 1, wallet: this.wallet, won: this.won, lost: this.lost, spent: this.spent, tide: this.tide, items: this.items, mapPieces: this.mapPieces };
+    return { v: 1, wallet: this.wallet, won: this.won, lost: this.lost, spent: this.spent, tide: this.tide, items: this.items, mapPieces: this.mapPieces, bounties: this.bounties.serialize() };
   }
   restore(d) {
     if (!d || d.v !== 1) return;
     Object.assign(this, { wallet: d.wallet, won: d.won, lost: d.lost, spent: d.spent, tide: d.tide, items: d.items.slice(0, this.cfg.items.max), mapPieces: Math.min(d.mapPieces, this.cfg.map.pieces - 1) });
+    this.bounties.restore(d.bounties);
   }
 }
 

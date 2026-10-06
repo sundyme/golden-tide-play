@@ -127,6 +127,8 @@ export const CONFIG = {
   // （常见是被推板压住、推不动）就由鹦鹉叼回下层台面前半区，避免终局永久卡死
   map: { pieces: 5, firstAt: 30, every: [130, 150], spinAdvance: 3.5, rescueAfter: 150, respawnAfterLost: 20, dropX: 1.8 },
 
+  // 悬赏令奖励（按档）：简单 20 枚、中等一个道具（金币雨 / 护栏）、困难 60 枚；题库和目标数在 src/gameplay/bounties.js
+  bounty: { rewards: [{ coins: 20 }, { item: true }, { coins: 60 }] },
   ending: { sailSeconds: 6, chestTipDelay: 1.2, chestCoins: 60, cardDelay: 6.5 },
 
   // 鹦鹉互动：戳满 pokesPerGift 下，鹦鹉从嘴里甩出几枚金币到台面（冷却按游戏时间计，几乎不影响平衡）

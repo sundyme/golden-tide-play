@@ -178,6 +178,7 @@
 @keyframes pipnew { 0% { transform: scale(2.2); filter: brightness(2.2); } 100% { transform: scale(1); } }
 .pop.spin { font-size: 6cqw; }
 .pop.spin.full { font-size: 4.4cqw; }
+.pop .pi { height: 1.25em; width: auto; vertical-align: -.3em; margin-right: .18em; }   /* 飘字前的小图标（需求单 09-5） */
 #spins i.lit { background: radial-gradient(circle at 35% 35%, #f2ffff, #3ff2ff 60%, #129ab8); box-shadow: 0 0 1.6cqw #3ff2ffcc; }
 
 /* ---------- 新手引导（src/ui/tutorial.js）：聚光圈 + 手指 + 小卡片；整层不拦点击 ---------- */
@@ -237,10 +238,10 @@
 
 /* ---------- 美术评审优化（2026-10-06 夜） ---------- */
 /* 开始界面：底下的游戏 HUD 先藏起来（开始页有自己的设置按钮） */
-.ui.prestart #plaque, .ui.prestart #maps, .ui.prestart #maps-label, .ui.prestart #btn-settings, .ui.prestart #items, .ui.prestart #chips { opacity: 0; pointer-events: none; }
+.ui.prestart #plaque, .ui.prestart #maps, .ui.prestart #maps-label, .ui.prestart #btn-settings, .ui.prestart #items, .ui.prestart #chips, .ui.prestart #btn-bounty { opacity: 0; pointer-events: none; }
 /* 电影镜头（Jackpot 拉远 / 终局）：收起操作类 UI，钱包和藏宝图保留 */
 #items, #hint, #btn-settings, #chips, #plaque, #maps { transition: opacity .3s; }
-.ui.cinematic #items, .ui.cinematic #hint, .ui.cinematic #btn-settings, .ui.cinematic #chips, .ui.cinematic #spins { opacity: 0 !important; pointer-events: none; }
+.ui.cinematic #items, .ui.cinematic #hint, .ui.cinematic #btn-settings, .ui.cinematic #chips, .ui.cinematic #spins, .ui.cinematic #btn-bounty { opacity: 0 !important; pointer-events: none; }
 /* 连击：固定在一个位置刷新，不再每次新生成一个叠在一起 */
 /* 连击徽章：蓝珐琅胶囊 + 金边，左边小字「连击」，右边大号金色倍数；连击越高越热（金 → 橙红） */
 #combo { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 1.3cqw; padding: .5cqw 2.6cqw .5cqw 2.2cqw; border-radius: 99px;
@@ -258,12 +259,52 @@
 
 /* 终局卡：首航 / 新纪录印章（珊瑚红圆章斜盖在卡片右上角，落下时砸一下）+ 最佳纪录小字 */
 #ending .card { position: relative; }
-#ending .stamp { position: absolute; top: -5cqw; right: -3cqw; width: 16cqw; height: 16cqw; z-index: 2; border-radius: 50%; display: grid; place-items: center; font: 4.2cqw "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: .1em; color: #ffe2d6; filter: drop-shadow(0 .8cqw 1.2cqw #000a); background: radial-gradient(circle, #d8452f 0 58%, transparent 59%), radial-gradient(circle, transparent 0 63%, #d8452f 64% 70%, transparent 71%); box-shadow: 0 0 0 .4cqw #ffffff22 inset; opacity: 0; transform: rotate(-16deg) scale(2.2); pointer-events: none; }
+#ending .stamp { position: absolute; top: -6cqw; right: -4cqw; width: 20cqw; height: 20cqw; z-index: 2; display: grid; place-items: center; font: 3.4cqw "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: .02em; color: #ffe2d6; text-shadow: 0 -.2cqw 0 #7a1c10, 0 .2cqw 0 #ff9a80; filter: drop-shadow(0 .8cqw 1.2cqw #000a); background: url(../../public/assets/ui/seal_blank.webp) center / contain no-repeat; opacity: 0; transform: rotate(-16deg) scale(2.2); pointer-events: none; }
 #ending .stamp:empty { display: none; }
+#ending .stamp:not(.long) { font-size: 4.4cqw; letter-spacing: .08em; }   /* 两个字的章写大一点，「新纪录」三个字要收进空白章面 */
 #ending .stamp.on { animation: stampin .42s cubic-bezier(.5, 0, .7, 1) .5s forwards; }
 @keyframes stampin { 0% { opacity: 0; transform: rotate(-16deg) scale(2.2); } 70% { opacity: 1; transform: rotate(-16deg) scale(.92); } 100% { opacity: .92; transform: rotate(-16deg) scale(1); } }
 #ending .best { font-size: 3.4cqw; color: #9fb3c6; letter-spacing: .06em; margin-bottom: 2cqw; min-height: 1em; }
 #ending .stats { row-gap: 1.1cqw; font-size: 4.2cqw; }
 /* 连击徽章上的浪花：连击在给大潮充能 */
-#combo .tide { font-style: normal; font-size: 4.2cqw; color: #5fe3f0; text-shadow: 0 0 1.6cqw #5fe3f0aa; margin-left: .2cqw; animation: tidebob 1s ease-in-out infinite; }
+#combo .tide { width: 6.4cqw; height: 6.4cqw; margin-left: .6cqw; filter: drop-shadow(0 0 1.4cqw #5fe3f0aa); animation: tidebob 1s ease-in-out infinite; }
 @keyframes tidebob { 50% { transform: translateY(-.5cqw); } }
+
+/* ---------- 悬赏令 ---------- */
+/* HUD 入口：设置齿轮左边的珐琅小胶囊（卷轴图标 + 「悬赏」+ 完成数）；有新悬赏时金边呼吸 */
+#btn-bounty { pointer-events: auto; position: absolute; right: 14.5cqw; top: calc(21.4cqw + var(--top)); height: 8.8cqw; display: flex; align-items: center; gap: 1cqw; padding: 0 2.6cqw 0 2cqw; border-radius: 4.4cqw; font: 3.6cqw "ZCOOL QingKe HuangYou", sans-serif; color: #f6dc94; cursor: pointer; transition: opacity .3s; filter: drop-shadow(0 .8cqw 1cqw #0008); }
+#btn-bounty img { width: 6cqw; height: 6.7cqw; margin: -.6cqw 0; filter: drop-shadow(0 .3cqw .4cqw #0009); }
+#btn-bounty b { font-weight: normal; letter-spacing: .1em; }
+#btn-bounty span { font-size: 3.6cqw; color: #fff1c8; }
+#btn-bounty.new { animation: bountynew 1.2s ease-in-out infinite; }
+@keyframes bountynew { 50% { box-shadow: inset 0 0 0 .45cqw #0a1c2e, 0 0 3.6cqw #ffd36acc, 0 0 0 .5cqw #ffd36a88; } }
+#btn-bounty.bump { animation: pop .5s cubic-bezier(.3, 1.8, .5, 1); }
+
+/* 面板：每条一张羊皮纸条（档位菱形 + 目标 + 金色进度条 + 进度 / 奖励），完成的盖珊瑚红「已领」章 */
+#bounty .bsub { font-size: 3.4cqw; color: #9fb3c6; letter-spacing: .12em; margin: -1cqw 0 3cqw; }
+#bounty .blist { width: 100%; display: flex; flex-direction: column; gap: 2.4cqw; margin-bottom: 4cqw; }
+.brow { position: relative; display: grid; grid-template-columns: 7.4cqw 1fr auto; align-items: center; gap: 2cqw; padding: 1.2cqw 1.4cqw; color: #3a2610;
+  border: 4.6cqw solid transparent; border-image: url(../../public/assets/ui/bounty_slip.webp) 96 fill / 4.6cqw stretch; filter: drop-shadow(0 .8cqw 1cqw #0008); }   /* 需求单 09-2：象牙珐琅牌 + 香槟金阶梯边框，九宫格拉伸（四角扇形纹各 96px） */
+.brow > * { margin: -2.4cqw 0; }   /* 边框留给四角装饰，内容往边框里收一点，条子不至于太高 */
+.brow .tier { width: 7.4cqw; height: auto; display: block; filter: drop-shadow(0 .3cqw .3cqw #0006); }
+.brow .btext b { display: block; font-weight: normal; font-size: 4cqw; line-height: 1.3; font-family: "ZCOOL QingKe HuangYou", sans-serif; }
+.brow .bar { display: block; height: 1.5cqw; margin-top: 1.2cqw; border-radius: 1cqw; background: #6e4c2244; box-shadow: inset 0 .2cqw .3cqw #0003; overflow: hidden; }
+.brow .bar i { display: block; height: 100%; border-radius: 1cqw; background: linear-gradient(180deg, #ffe39a, #d9962a); }
+.brow .bside { text-align: right; display: flex; flex-direction: column; gap: .4cqw; }
+.brow .bside em { font-style: normal; font-size: 3.8cqw; color: #5a3a14; }
+.brow .bside small { font-size: 2.9cqw; color: #8a6430; white-space: nowrap; }
+.brow.done { filter: saturate(.75); }
+.brow.done .bar i { background: linear-gradient(180deg, #ffd0b8, #d8452f); }
+.brow .bstamp { position: absolute; right: -1cqw; top: 50%; width: 14cqw; height: 14cqw; margin: -7cqw 0 0; font-size: 0; transform: rotate(-14deg); filter: drop-shadow(0 .5cqw .6cqw #0007);
+  background: url(../../public/assets/ui/seal_skull.webp) center / contain no-repeat; }   /* 已领：骷髅火漆章（文字留给读屏） */
+
+/* 完成提示：从顶部滑下的羊皮纸条，左边一枚印章，右边奖励；3 秒后收起 */
+#btoast { position: absolute; left: 50%; top: calc(33cqw + var(--top)); width: 78cqw; display: grid; grid-template-columns: 10cqw 1fr auto; align-items: center; gap: 2.4cqw; padding: 0 1.4cqw; color: #3a2610; pointer-events: none;
+  border: 4.2cqw solid transparent; border-image: url(../../public/assets/ui/bounty_slip.webp) 96 fill / 4.2cqw stretch; filter: drop-shadow(0 1.2cqw 1.6cqw #000a) drop-shadow(0 0 3cqw #ffd36a55); opacity: 0; transform: translate(-50%, -8cqw); transition: opacity .3s, transform .4s cubic-bezier(.3, 1.5, .5, 1); z-index: 5; }
+#btoast.on { opacity: 1; transform: translate(-50%, 0); }
+#btoast .seal { width: 11cqw; height: 11cqw; margin: -2.4cqw -.5cqw; background: url(../../public/assets/ui/seal_skull.webp) center / contain no-repeat; filter: drop-shadow(0 .4cqw .5cqw #0007); }
+#btoast.on .seal { animation: sealhit .45s cubic-bezier(.5, 0, .7, 1) .15s both; }
+@keyframes sealhit { 0% { transform: scale(2.2) rotate(-20deg); opacity: 0; } 70% { transform: scale(.9) rotate(-12deg); opacity: 1; } 100% { transform: scale(1) rotate(-12deg); } }
+#btoast b { display: block; font: normal 3.2cqw "ZCOOL QingKe HuangYou", sans-serif; color: #b3301e; letter-spacing: .14em; }
+#btoast span { display: block; font: normal 4.2cqw "ZCOOL QingKe HuangYou", sans-serif; }
+#btoast em { font-style: normal; font-size: 5.4cqw; color: #9a5a10; }
