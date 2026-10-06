@@ -2,6 +2,9 @@
 // 调用方先 await RAPIER.init()，再把 RAPIER 传进来。
 
 const DEG = Math.PI / 180;
+// 碰撞分组（高 16 位 = 所属，低 16 位 = 与谁相撞）
+const GROUP_ITEM = (0x0001 << 16) | 0xffff;   // 台面上的币 / 宝石 / 火药桶 / 藏宝图
+const GROUP_FLY = (0x0002 << 16) | 0xfffe;    // 飞行中的炮弹币：不撞台面物体
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -140,8 +143,11 @@ export class PusherPhysics {
       col = R.ColliderDesc.cuboid(S.mapSize[0] / 2, 0.035, S.mapSize[1] / 2).setDensity(S.mapDensity);
     }
     col.setFriction(kind === 'gem' ? 0.5 : C.friction).setRestitution(C.restitution);
-    this.world.createCollider(col, body);
-    const o = { id: this.nextId++, kind, body, scale, born: this.time, ccdUntil: ccd ? this.time + C.ccdSeconds : 0, out: null, gateCheck, flyUntil: fly ? this.time + fly : 0 };
+    // 碰撞分组：台面物体是第 0 位；炮弹币飞行途中换到第 1 位、且不和第 0 位相撞——从船头低处打上来时会擦到挂在台边的币，
+    // 被撞回去掉进宝箱。升过台面后（见离台判定）换回普通分组。固定几何体用默认的全分组，照常相撞
+    col.setCollisionGroups(fly ? GROUP_FLY : GROUP_ITEM);
+    const collider = this.world.createCollider(col, body);
+    const o = { id: this.nextId++, kind, body, scale, born: this.time, ccdUntil: ccd ? this.time + C.ccdSeconds : 0, out: null, gateCheck, flyUntil: fly ? this.time + fly : 0, collider };
     this.coins.push(o);
     return o;
   }
@@ -284,8 +290,8 @@ export class PusherPhysics {
           }
         } else c.prevGateY = p.y;
       }
-      // 炮弹币：从甲板上的船炮打上台面，飞行途中（还没升过台面）不做离台判定
-      if (c.flyUntil) { if (p.y > 0.5 || this.time > c.flyUntil) c.flyUntil = 0; else continue; }
+      // 炮弹币：从甲板上的船炮打上台面，上升途中不做离台判定、不撞台面物体；过了弧顶（开始下落，早已高过台边堆着的币）才恢复
+      if (c.flyUntil) { if ((p.y > 0.5 && c.body.linvel().y < 0) || this.time > c.flyUntil) { c.flyUntil = 0; c.collider.setCollisionGroups(GROUP_ITEM); } else continue; }
       // 离台判定：一落到台面以下就归类并移出物理世界（之后的下落 / 入箱 / 落海由 VFX 演）
       // 侧面敞开段：币心已在台边以外、低于台面 → 不可能再回到台上，提前交给 VFX，让它竖着落进落海槽（不穿槽壁）
       // 前沿同理：币心越过前沿、低于台面就交出去。以前等到 y < −0.7 才交，那时币已低于宝箱沿（≈ −0.71）、

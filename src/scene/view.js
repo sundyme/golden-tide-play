@@ -171,8 +171,10 @@ export class GameView {
     // 船炮：立在船头甲板、收币宝箱两侧，炮口斜指台面（Jackpot 时朝台面喷金币）
     // 原来架在机罩后方两侧的木托架上，玩家视角里被机罩挡住，看不到
     this.cannons = [-1, 1].map(s => {
-      const c = put(s < 0 ? cannon : cannon.clone(), [s * 4.8, DECK_Y, 6.0], 0, 1.0);
-      c.rotation.set(0, -s * 2.57, 0);   // cannon.glb 根节点自带 x / z 翻转 180°，只改 y 会把炮口转反
+      // 位置按炮的实际轮廓搜出来：夹在宝箱和船舷扶手之间都留 0.2 左右的缝，炮口离台面前沿够远（炮弹币弧线不擦台边）
+      // 原来 (±4.8, 6.0)、1.0 倍时，炮架尾巴和后轮插进了船舷扶手里
+      const c = put(s < 0 ? cannon : cannon.clone(), [s * 3.85, DECK_Y, 5.85], 0, 0.92);
+      c.rotation.set(0, -s * 2.6, 0);   // cannon.glb 根节点自带 x / z 翻转 180°，只改 y 会把炮口转反
       const barrel = c.getObjectByName('barrel'); if (barrel) barrel.rotation.x = -0.35;
       return { root: c, barrel, base: barrel?.position.clone(), side: s, recoil: 0 };
     });
@@ -195,7 +197,7 @@ export class GameView {
     put(keg.clone(), [-6.3, DECK_Y, -3.3], -0.3, 0.9);
     put(keg.clone(), [6.2, DECK_Y, -4.2], 2.1, 1.05);
     const a = put(anchor, [3.3, DECK_Y + 0.05, 8.6], -0.95, 0.8); a.rotation.z = 0.3;
-    this._ropeCoil(-3.5, 7.6, 0.6, 0.85);
+    this._ropeCoil(-3.0, 8.35, 0.6, 0.85);
     // 远景小岛：夜里在船尾方向；终局的金币岛在船头前方
     // 远景小岛：在雾里若隐若现，岛上有几点暖色灯火
     const isles = [put(island, [-19, -6.3, -52], 0.9, 0.8), put(island.clone(), [21, -6.5, -92], -1.2, 0.85), put(island.clone(), [-40, -6.8, -130], 2.0, 1.4)];
@@ -500,7 +502,7 @@ export class GameView {
     for (const c of this.cannons) {
       if (!c.barrel) continue;
       c.recoil = Math.max(0, c.recoil - dt * 6);
-      c.barrel.position.copy(c.base).add(new THREE.Vector3(0, 0, -0.35 * c.recoil));
+      c.barrel.position.copy(c.base).add(new THREE.Vector3(0, 0, -0.22 * c.recoil));   // 后坐不能太大：炮尾离船舷只有 0.2 多
     }
   }
 

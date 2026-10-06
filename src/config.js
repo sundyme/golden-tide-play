@@ -115,7 +115,7 @@ export const CONFIG = {
   // 推落前沿的价值（落海为 0）
   payout: { coin: 1, giant: 6, gem: 20, keg: 0, map: 0 },
 
-  jackpot: { slowmo: 0.25, slowmoSeconds: 0.6, cannonCoins: 36, waterfallCoins: 30, bonus: 50, cannonFrom: [3.94, -1.14, 4.66] },  // cannonFrom：炮口出币点（x 取 ±；船头甲板上的炮，view.js 会按炮口实测覆盖）
+  jackpot: { slowmo: 0.25, slowmoSeconds: 0.6, cannonCoins: 36, waterfallCoins: 30, bonus: 50, cannonFrom: [3.09, -1.31, 4.59] },  // cannonFrom：炮口出币点（x 取 ±；船头甲板上的炮，view.js 会按炮口实测覆盖）
 
   // 藏宝图：每开转一次老虎机，下一片提前 spinAdvance 秒（瞄得准 → 转得多 → 更快集齐）；台上放了 rescueAfter 秒还没推下来
   // （常见是被推板压住、推不动）就由鹦鹉叼回下层台面前半区，避免终局永久卡死
