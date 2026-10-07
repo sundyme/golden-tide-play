@@ -4,7 +4,7 @@
 
 **试玩：https://sundyme.github.io/golden-tide-play/**
 
-手机和电脑浏览器都能玩（推荐 Chrome / Safari 最新版）。本仓库只放发布版本的游戏文件，当前版本 v2.3（悬赏令：每次航行 3 条小目标，完成盖章领奖）。
+手机和电脑浏览器都能玩（推荐 Chrome / Safari 最新版）。本仓库只放发布版本的游戏文件，当前版本 v2.4（开场序曲与起航仪式；修复手机切后台回来画面变暗）。
 
 **美术分支试玩 · 汽水海（糖果色）：https://sundyme.github.io/golden-tide-play/soda/**
 

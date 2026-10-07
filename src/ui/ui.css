@@ -136,6 +136,10 @@
 @keyframes fadein { from { opacity: 0; transform: translateY(3cqw); } }
 #start .row { display: flex; gap: 4cqw; margin: 4cqw 0 6cqw; animation: fadein .8s 1.3s both; }
 #start .best { font-size: 3.6cqw; color: #ffe9b8cc; margin-bottom: 10cqw; animation: fadein .8s 1.4s both; text-shadow: 0 .3cqw .5cqw #000; }
+#start .snd-hint { position: absolute; top: 4cqw; right: 4cqw; display: flex; align-items: center; gap: 1.2cqw; padding: 1.2cqw 2.6cqw; border-radius: 4cqw; font-size: 3cqw; letter-spacing: .12em; color: #f6e2b0; background: #0b1f36cc; box-shadow: inset 0 0 0 .25cqw #d9b46a88; animation: fadein .8s 1s both; transition: opacity .4s; }
+#start .snd-hint svg { width: 4cqw; height: 4cqw; fill: currentColor; animation: sndpulse 1.6s ease-in-out infinite; }
+.snd-on #start .snd-hint { opacity: 0; pointer-events: none; }
+@keyframes sndpulse { 50% { transform: scale(1.15); } }
 #start .note { position: absolute; bottom: 3cqw; font-size: 2.8cqw; color: #ffffff88; }
 
 /* ---------- 面板（设置 / 结局）：装饰艺术卡片 ---------- */

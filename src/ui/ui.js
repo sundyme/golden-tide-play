@@ -76,6 +76,7 @@ export class GameUI {
         <button class="btn-deco" id="btn-start">起航</button>
         <div class="row"><button class="icon-btn enamel" id="btn-settings2" aria-label="设置">${GEAR}</button></div>
         <div class="best" id="best"></div>
+        <div class="snd-hint"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>轻触屏幕 · 开启配乐</div>
         <div class="note">游戏内金币为虚拟道具，不可兑换</div>
       </div>
       <div id="settings" class="screen scrim hide">

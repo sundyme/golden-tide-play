@@ -63,6 +63,13 @@ export class GameView {
       badge = new THREE.CanvasTexture(c); badge.colorSpace = THREE.SRGBColorSpace; badge.anisotropy = 4; }
     sky.colorSpace = goldSky.colorSpace = THREE.SRGBColorSpace;
     this.scene.environment = buildEnvMap(this.renderer, sky);
+    // 手机浏览器在后台放久了会回收 WebGL 上下文，回来时 three.js 自动恢复、贴图重新上传，
+    // 但环境光贴图是 PMREM 现场烘出来的（只存在显存里），恢复后是空的 → 金币和金属失去反光，整个画面发黑。恢复时重烘一次。
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      const old = this.scene.environment;
+      this.scene.environment = buildEnvMap(this.renderer, sky);
+      old?.dispose();
+    });
 
     this.machine = new Machine(this.scene, this.cfg, { reelStrips: reelArt.strips, kit: kit.scene, badgeTex: badge });
     this.reels = new SlotReels(this.machine.reels, reelArt);

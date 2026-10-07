@@ -28,6 +28,13 @@ async function boot() {
   const settings = { music: true, sfx: true, voice: true, quality: matchMedia('(max-width: 600px)').matches ? 'medium' : 'high', ...saved.settings };
   if (params.get('q')) settings.quality = params.get('q');
 
+  // 音频先建好：加载页就开始放序曲（第一次点击之前浏览器会让它静音挂起，点哪儿都算解锁）
+  const audio = new GameAudio();
+  audio.settings.music = settings.music; audio.settings.sfx = settings.sfx; audio.settings.voice = settings.voice;
+  audio.onState = on => document.documentElement.classList.toggle('snd-on', on);
+  try { audio.prepare(); } catch (e) { console.warn('audio', e); }
+  for (const ev of ['pointerdown', 'keydown', 'touchend']) document.addEventListener(ev, () => audio.unlock(), { capture: true, passive: true });
+
   await RAPIER.init();
   const sim = new PusherPhysics(RAPIER, CONFIG);
   const view = new GameView(canvas, CONFIG, settings.quality);
@@ -56,8 +63,6 @@ async function boot() {
   const game = new Game(sim, CONFIG);
   if (saved.game) game.restore(saved.game);
   const best = { won: 0, endings: 0, ...saved.best };
-  const audio = new GameAudio();
-  audio.settings.music = settings.music; audio.settings.sfx = settings.sfx; audio.settings.voice = settings.voice;
 
   let started = false, paused = false;
   let tut = null;
@@ -67,11 +72,11 @@ async function boot() {
     start() {
       if (started) return;
       started = true;
-      audio.init().then(() => audio.ui('start'));
+      audio.unlock(); audio.voyage(); audio.ui('start');
       ui.hideStart();
       tut.start();
     },
-    pause(on) { paused = on; audio.pause(on); if (!on) last = performance.now(); },
+    pause(on) { paused = on; if (started) audio.pause(on); if (!on) last = performance.now(); },   // 起航前（起航页上开设置）序曲照放
     useItem(i) { if (started && game.useItem(i, dropX)) audio.ui('click'); },
     setting(k, v) {
       settings[k] = v; ui.syncSettings(settings); persist();
@@ -103,6 +108,7 @@ async function boot() {
     audio.onEvent(e, game);
     if (e.type === 'endingCard') { best.endings++; persist(); }
   });
+  audio.revealTitle();   // 起航页出现：序曲落下全奏（还没解锁就等第一次点击）
   $('loading').style.opacity = 0;
   setTimeout(() => $('loading').remove(), 450);
 
@@ -149,7 +155,7 @@ async function boot() {
   });
 
   // 切到后台：暂停 + 存档
-  document.addEventListener('visibilitychange', () => { audio.pause(document.hidden || paused); if (document.hidden) persist(); else last = performance.now(); });
+  document.addEventListener('visibilitychange', () => { audio.pause(document.hidden || (paused && started)); if (document.hidden) persist(); else last = performance.now(); });
   addEventListener('pagehide', persist);
   setInterval(() => { if (started) persist(); }, 5000);
 

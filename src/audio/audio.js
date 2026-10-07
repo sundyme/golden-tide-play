@@ -2,23 +2,9 @@
 //   音乐：原创海盗小调，三层随潮汐加厚（L1 低音 + 手风琴和弦 · L2 提琴旋律 · L3 打击乐），Jackpot / 终局全开
 //   音效：金币碰撞（预渲染多变体，按冲击强度叠层）、连击升调、落海水花、骷髅门、老虎机、火药桶、炮击、大潮…
 //   总线：music / sfx → 压缩器 → 输出；大事件时音乐闪避（ducking）；简易卷积混响
-const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+import { mtof, MELODY, CHORDS, MELODY_B, CHORDS_B, FORM } from './theme.js';
+import { Overture } from './overture.js';
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26];
-
-// 原创旋律（D 小调 / 多利亚，8 小节 × 8 个八分音符；-1 休止）
-const MELODY = [
-  [69, 69, 74, 74, 76, 77, 76, 74], [76, 72, 72, -1, 67, 72, 76, 79], [77, 76, 74, 69, 74, 77, 81, 77], [76, -1, 72, 69, 76, -1, 69, -1],
-  [69, 74, 77, 81, 79, 77, 76, 74], [72, 76, 79, 76, 72, 76, 79, 84], [74, 77, 82, 77, 73, 76, 81, 76], [74, -1, 69, -1, 74, -1, -1, -1],
-];
-const CHORDS = [[50, 53, 57], [48, 52, 55], [50, 53, 57], [45, 48, 52], [50, 53, 57], [48, 52, 55], [46, 50, 53, 45, 49, 52], [50, 53, 57]];
-// B 段（对比段：从降 B 大和弦起，旋律更高更舒展，结尾停在 A 大和弦，拉回 A 段的 D 小调）
-const MELODY_B = [
-  [74, -1, 77, -1, 74, 72, 70, -1], [72, -1, 76, -1, 79, 77, 76, 72], [74, 77, 81, -1, 81, 79, 77, 76], [76, -1, -1, 72, 69, 72, 76, -1],
-  [77, -1, 74, 77, 82, -1, 81, 79], [79, -1, 76, 79, 84, -1, 82, 81], [79, 77, 74, 70, 74, 77, 79, 82], [81, -1, 76, -1, 73, -1, 76, -1],
-];
-const CHORDS_B = [[46, 50, 53], [48, 52, 55], [50, 53, 57], [45, 48, 52], [46, 50, 53], [48, 52, 55], [43, 46, 50], [45, 49, 52]];
-// 曲式：A A B A（32 小节一轮）
-const FORM = ['A', 'A', 'B', 'A'];
 
 export class GameAudio {
   constructor() {
@@ -28,10 +14,12 @@ export class GameAudio {
     this.tension = 0;
   }
 
-  // 必须在用户手势里调用
-  async init() {
-    if (this.ctx) { this.ctx.resume(); return; }
-    const C = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // 页面一打开就建好音频图（加载页就要有配乐）。浏览器在用户第一次点击之前会让它挂起静音，
+  // 所以 main.js 在任何点击 / 按键里调 unlock()；挂起期间序曲不排音符，解锁后从当前阶段开始放。
+  prepare(ctx = null) {   // ctx：离线渲染试听时传 OfflineAudioContext（tools/shots/overture.json）
+    if (this.ctx) return;
+    const C = this.ctx = ctx ?? new (window.AudioContext || window.webkitAudioContext)();
+    C.onstatechange = () => this.onState?.(C.state === 'running');
     this.comp = C.createDynamicsCompressor();
     this.comp.threshold.value = -16; this.comp.knee.value = 10; this.comp.ratio.value = 4; this.comp.attack.value = 0.004; this.comp.release.value = 0.2;
     // 总线：高通 40 Hz（手机喇叭放不出来的超低频只会吃掉压缩器余量）→ 压缩 → 增益 → 限幅
@@ -49,12 +37,27 @@ export class GameAudio {
     this.layers = [0, 1, 2].map(() => { const g = C.createGain(); g.gain.value = 0; g.connect(this.music); return g; });
     this.musicRev = C.createGain(); this.musicRev.gain.value = 0.35; this.music.connect(this.musicRev).connect(this.revIn);
     this.noise = this._noiseBuf(2);
-    this.clinks = await Promise.all(Array.from({ length: 8 }, (_, i) => this._renderClink(i)));
+    Promise.all(Array.from({ length: 8 }, (_, i) => this._renderClink(i))).then(b => { this.clinks = b; });
     this._ocean();
-    this.step = 0; this.nextT = C.currentTime + 0.1; this.tempo = 132;
+    this.overture = new Overture(C, this.music, this.revIn, { boom: (t, d, k) => this._boom(t, d, k) });
+    this.overture.startLoading(0);
+    this.step = 0; this.nextT = 0; this.tempo = 132;
+    this.gameOn = false;          // 游戏快板：起航仪式结束才进来
     this.timer = setInterval(() => this._schedule(), 25);
+  }
+  // 在用户手势里调（任何一次点击 / 按键）：恢复音频；暂停菜单开着时不恢复
+  unlock() {
+    this.prepare();
+    if (this.ctx.state !== 'running' && !this.paused) this.ctx.resume();
     if (this.settings.voice) this.loadVoice();
   }
+  get running() { return this.ctx?.state === 'running'; }
+  // 加载完成（起航页出现）：音频已经在放就立刻落下全奏；还没解锁就等第一次点击时再落
+  revealTitle() { this.wantReveal = true; }
+  // 点「起航」：起航仪式 → 游戏快板。点击本身会解锁音频，但 resume() 是异步的，所以在调度里等它真正跑起来；
+  // 1.5 秒内没跑起来（无头测试 / 被拦截）就不放仪式，之后解锁时直接进快板。
+  voyage() { this.wantVoyage = performance.now(); }
+  async init() { this.unlock(); }
 
   // ---------- 鹦鹉配音：预生成的语音（public/assets/voice，按台词文本索引）；关掉时用合成叫声 ----------
   loadVoice() {
@@ -89,7 +92,7 @@ export class GameAudio {
     const g = key === 'music' ? this.music.gain : this.sfx.gain;
     g.setTargetAtTime(on ? (key === 'music' ? 0.42 : 0.9) : 0, this.ctx.currentTime, 0.05);
   }
-  pause(on) { if (!this.ctx) return; on ? this.ctx.suspend() : this.ctx.resume(); }
+  pause(on) { this.paused = on; if (!this.ctx) return; on ? this.ctx.suspend() : this.ctx.resume(); }
 
   // ---------- 基础构件 ----------
   _impulse(sec) {
@@ -178,6 +181,18 @@ export class GameAudio {
   _schedule() {
     const C = this.ctx;
     if (C.state !== 'running') { this.nextT = C.currentTime + 0.05; return; }
+    const now = C.currentTime, O = this.overture;
+    if (this.wantVoyage) {
+      const fresh = performance.now() - this.wantVoyage < 1500;
+      this.wantVoyage = 0; this.wantReveal = false;
+      if (fresh && O.phase !== 'done') { this.nextT = O.ceremony(now + 0.03); this.step = 0; }
+      else { O.stop(now); this.nextT = now + 0.1; }
+      this.gameOn = true;
+    }
+    if (this.wantReveal && O.phase === 'loading') { this.wantReveal = false; O.reveal(now + 0.03); }
+    O.tick(now);
+    if (!this.gameOn) return;
+    if (this.nextT < now - 0.5) this.nextT = now + 0.05;
     // 层级渐变
     const I = this.intensity, t0 = C.currentTime;
     [1, I > 0.33 ? 1 : 0.0001, I > 0.7 ? 1 : 0.0001].forEach((v, i) => this.layers[i].gain.setTargetAtTime(v * [0.9, 0.7, 0.8][i], t0, 0.6));
@@ -294,7 +309,7 @@ export class GameAudio {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     if (kind === 'click') { this._osc('triangle', 900, t, 0.06, { gain: 0.08 }); this._osc('sine', 1800, t + 0.03, 0.08, { gain: 0.04 }); }
-    if (kind === 'start') { this._fanfare(t, true); this.haptic(30); }
+    if (kind === 'start') this.haptic(30);   // 起航的声音是序曲里的起航仪式（voyage）
   }
   // 鹦鹉叫声：锯齿波 + 快速音高轮廓，过两个带通共振峰（鼻音），再用 ~70 Hz 调幅做出沙哑感
   _caw(t, dur, f0, f1, f2, gain = 0.16) {

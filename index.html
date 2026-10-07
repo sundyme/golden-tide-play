@@ -29,6 +29,10 @@
     #loading .bar i { position: relative; display: block; height: 100%; width: 0; border-radius: calc(.7 * var(--u)); background: linear-gradient(180deg, #fff1c8 0%, #ffd36a 45%, #c47a1c 100%); box-shadow: 0 0 calc(1.6 * var(--u)) #ffc23a99; transition: width .35s ease-out; overflow: hidden; }
     #loading .bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, #fff9 50%, transparent 70%) -100% 0/60% 100% no-repeat; animation: loadshine 1.6s linear infinite; }
     #loading .msg { margin-top: calc(3.4 * var(--u)); font: calc(3.6 * var(--u)) "ZCOOL QingKe HuangYou", "Hiragino Sans GB", sans-serif; letter-spacing: .4em; text-indent: .4em; color: #e9d3a0; opacity: .85; }
+    #loading .snd { margin-top: calc(6 * var(--u)); display: flex; align-items: center; gap: calc(1.4 * var(--u)); font: calc(3 * var(--u)) "ZCOOL QingKe HuangYou", "Hiragino Sans GB", sans-serif; letter-spacing: .2em; color: #e9d3a0; opacity: .55; animation: sndblink 2.4s ease-in-out infinite; transition: opacity .4s; }
+    #loading .snd svg { width: calc(4 * var(--u)); height: calc(4 * var(--u)); fill: currentColor; }
+    .snd-on #loading .snd { opacity: 0; animation: none; }
+    @keyframes sndblink { 50% { opacity: .9; } }
     @keyframes loadshine { to { background-position: 250% 0; } }
     @keyframes loadfloat { 50% { transform: translateY(calc(-1 * var(--u))); } }
     .lil-gui.root { position: absolute; top: 44px; right: 6px; z-index: 20; }
@@ -47,7 +51,7 @@
 <body>
   <div id="stage">
     <div id="frame">
-      <div id="loading"><div class="inner"><img class="logo" src="./public/assets/ui/logo.webp" alt=""><div class="track"><div class="bar"><i id="loadbar"></i></div></div><div class="msg">起锚中…</div></div></div>
+      <div id="loading"><div class="inner"><img class="logo" src="./public/assets/ui/logo.webp" alt=""><div class="track"><div class="bar"><i id="loadbar"></i></div></div><div class="msg">起锚中…</div><div class="snd"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>轻触屏幕 · 开启配乐</div></div></div>
       <div id="stats"></div>
     </div>
   </div>
