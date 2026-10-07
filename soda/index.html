@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>金潮号 GOLDEN TIDE</title>
+  <meta name="theme-color" content="#bdebff" />
+  <link rel="icon" href="./public/assets/ui/icon_coin.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&display=swap" />
+  <!-- D1-46/56：中文 UI 字体 = 寒蝉全圆体 Bold（ChillRound，基于 Kosugi Maru / jf open 粉圆 / 猫啃，SIL OFL），按字符分包的 web 字体；数字 / 英文 Fredoka。
+       D1-55 曾换回站酷快乐体 + Lilita One，用户随后要求用回圆体 -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@chinese-fonts/hcqyt@2.0.0/dist/ChillRoundFBold/result.css" />
+  <link rel="stylesheet" href="./src/ui/ui.css" />
+  <style>
+    :root { --ink: #3b3486; --bg: #bdebff; }
+    html, body { margin: 0; height: 100%; background: #9fdcff; color: var(--ink); font: 13px/1.4 -apple-system, "Hiragino Sans GB", sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #stage { position: absolute; inset: 0; display: grid; place-items: center; }
+    #frame { position: relative; aspect-ratio: 9 / 16; height: 100%; max-width: 100%; background: var(--bg); overflow: hidden; container-type: size; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #stats { position: absolute; left: 10px; bottom: 26cqw; z-index: 3; font-size: 11px; opacity: .65; pointer-events: none; white-space: pre; font-family: ui-monospace, monospace; }
+    #loading { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: linear-gradient(#bdebff, #e9f8ff 50%, #b9b0ff); transition: opacity .4s; }
+    #loading .bar { width: 50%; height: 10px; border-radius: 5px; background: #ffffffaa; border: 2px solid #fff; overflow: hidden; margin-top: 10px; }
+    #loading .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd23c, #ff7a8a); border-radius: 5px; }
+    .lil-gui.root { position: absolute; top: 44px; right: 6px; z-index: 20; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/dist/rapier.mjs",
+      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="stage">
+    <div id="frame">
+      <div id="loading"><div style="text-align:center"><img src="./public/assets/ui/logo.webp" alt="" style="width:62cqw;opacity:.9"><div class="bar"><i id="loadbar"></i></div><div style="margin-top:8px;opacity:.6">起锚中…</div></div></div>
+      <div id="stats"></div>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
