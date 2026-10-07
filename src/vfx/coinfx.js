@@ -2,6 +2,7 @@
 //   前沿掉落 → 先自由下落一小段，再被"吸"进宝箱（加速 + 旋转），落袋闪光，箱内金币堆增高
 //   侧面掉落 → 竖着落进两侧的落海槽（台边与槽外壁之间），消失在槽底的黑暗里（以前往外抛，会穿过槽壁和柜壁）
 import * as THREE from 'three';
+import { SpriteBatch } from './batch.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler();
 
@@ -36,6 +37,7 @@ export class CoinFX {
     // 闪光与水花：共享的加法混合精灵池
     this.sparkTex = radialTex();
     this.sparks = [];
+    this.sparkBatch = new SpriteBatch(scene, { map: this.sparkTex, blending: THREE.AdditiveBlending, cap: 360, renderOrder: 3 });   // 合批，见 batch.js
     this.splashes = [];
     const ringGeo = new THREE.RingGeometry(0.6, 1, 40); ringGeo.rotateX(-Math.PI / 2);
     this.ringGeo = ringGeo;
@@ -137,11 +139,12 @@ export class CoinFX {
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       const s = this.sparks[i]; s.userData.t += dt;
       const k = s.userData.t / s.userData.life;
-      if (k >= 1) { this.scene.remove(s); this.sparks.splice(i, 1); continue; }
+      if (k >= 1) { this.sparkBatch.remove(s); this.sparks[i] = this.sparks[this.sparks.length - 1]; this.sparks.pop(); continue; }
       s.position.addScaledVector(s.userData.v, dt); s.userData.v.y -= 6 * dt;
       s.material.opacity = (1 - k) * (1 - k);
       s.scale.setScalar(s.userData.size * (0.6 + 0.8 * Math.sin(Math.min(1, k * 3) * Math.PI * 0.5)));
     }
+    this.sparkBatch.flush();
     for (let i = this.splashes.length - 1; i >= 0; i--) {
       const s = this.splashes[i]; s.userData.t += dt;
       const k = s.userData.t / 0.9;
@@ -219,10 +222,11 @@ export class CoinFX {
   }
 
   _spark(pos, color, size, vel, life) {
-    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.sparkTex, color: new THREE.Color(color).multiplyScalar(3), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+    const m = this.sparkBatch.add(new THREE.Color(color).multiplyScalar(3));
+    if (!m) return;
     m.position.copy(pos); m.userData = { t: 0, life, v: vel, size };
     m.scale.setScalar(size);
-    this.scene.add(m); this.sparks.push(m);
+    this.sparks.push(m);
   }
 
   _splash(p) {

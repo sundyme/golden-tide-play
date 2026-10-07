@@ -26,6 +26,7 @@ export const CONFIG = {
     tableFrontZ: 3.6,        // 下层台面前沿（悬崖）
     tableBackZ: -7.5,
     tableThickness: 0.5,
+    frontLip: { z: 3.66, y: -0.13, r: 0.19 },   // 台沿黄铜包边的碰撞胶囊（贴合 cab_brass 前沿：顶 y≈0.06，前缘 z≈3.85）
     sideOpenFromZ: 0.0,      // 此 z 之后左右两侧无护栏，币会掉进海里（sweep2 定稿）
     sideWallHeight: 8.0,     // 隐形侧墙（推台区）：要高过投币点，否则被骷髅门弹飞的币会从墙上飞出机台、穿过柜壁护栏
     guardWallHeight: 0.7,    // 鹦鹉护栏升起高度

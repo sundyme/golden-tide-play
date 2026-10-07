@@ -6,11 +6,15 @@
   <title>金潮号 GOLDEN TIDE</title>
   <meta name="theme-color" content="#050b1c" />
   <link rel="icon" href="./public/assets/ui/icon_coin.webp" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=ZCOOL+QingKe+HuangYou&display=swap" />
+  <!-- 字体、three、Rapier 全部本地托管（Google Fonts / jsDelivr 在国内不稳定）；字体子集用 tools/build_fonts.py 生成 -->
+  <link rel="preload" href="./public/assets/fonts/zcool-qingke.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="./public/assets/fonts/lilita-one.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="modulepreload" href="./public/vendor/three/build/three.core.min.js" />
+  <link rel="modulepreload" href="./public/vendor/rapier/rapier.mjs" />
   <link rel="stylesheet" href="./src/ui/ui.css" />
   <style>
+    @font-face { font-family: "ZCOOL QingKe HuangYou"; src: url(./public/assets/fonts/zcool-qingke.woff2) format("woff2"); font-display: swap; }
+    @font-face { font-family: "Lilita One"; src: url(./public/assets/fonts/lilita-one.woff2) format("woff2"); font-display: swap; }
     :root { --ink: #ffe9c2; --bg: #0b1a33; }
     html, body { margin: 0; height: 100%; background: #070d1c; color: var(--ink); font: 13px/1.4 -apple-system, "Hiragino Sans GB", sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
     #stage { position: absolute; inset: 0; display: grid; place-items: center; }
@@ -33,6 +37,13 @@
     #loading .snd svg { width: calc(4 * var(--u)); height: calc(4 * var(--u)); fill: currentColor; }
     .snd-on #loading .snd { opacity: 0; animation: none; }
     @keyframes sndblink { 50% { opacity: .9; } }
+    /* 手机横屏：画框只剩一条，盖一层提示（桌面横屏窗口照常居中显示竖屏画框） */
+    #rotate { display: none; position: fixed; inset: 0; z-index: 50; background: radial-gradient(70% 60% at 50% 45%, #14305a, #050b18); color: #f6e2b0; flex-direction: column; align-items: center; justify-content: center; gap: 2.4vh; font-family: "ZCOOL QingKe HuangYou", sans-serif; text-align: center; }
+    #rotate svg { width: 18vh; height: 18vh; color: #e0bc76; animation: rot 2.4s ease-in-out infinite; }
+    #rotate b { font-weight: normal; font-size: 6vh; letter-spacing: .2em; }
+    #rotate span { font-size: 3.6vh; letter-spacing: .2em; opacity: .7; }
+    @keyframes rot { 0%, 30% { transform: rotate(-90deg); } 60%, 100% { transform: rotate(0); } }
+    @media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) { #rotate { display: flex; } }
     @keyframes loadshine { to { background-position: 250% 0; } }
     @keyframes loadfloat { 50% { transform: translateY(calc(-1 * var(--u))); } }
     .lil-gui.root { position: absolute; top: 44px; right: 6px; z-index: 20; }
@@ -40,10 +51,10 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-      "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/dist/rapier.mjs",
-      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js"
+      "three": "./public/vendor/three/build/three.module.min.js",
+      "three/addons/": "./public/vendor/three/examples/jsm/",
+      "@dimforge/rapier3d-compat": "./public/vendor/rapier/rapier.mjs",
+      "lil-gui": "./public/vendor/lil-gui/lil-gui.esm.min.js"
     }
   }
   </script>
@@ -55,6 +66,7 @@
       <div id="stats"></div>
     </div>
   </div>
+  <div id="rotate"><svg viewBox="0 0 64 64"><rect x="20" y="8" width="24" height="44" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="46" r="2" fill="currentColor"/><path d="M50 30a18 18 0 0 0-10-14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M38 12l3 5-5 2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><b>请把手机竖过来玩</b><span>金潮号是竖屏游戏</span></div>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

@@ -54,7 +54,7 @@ export class GameView {
   async _load() {
     const texLoader = new THREE.TextureLoader();
     const tex = url => texLoader.loadAsync(ASSET + url);
-    const draco = new DRACOLoader().setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/libs/draco/gltf/');
+    const draco = new DRACOLoader().setDecoderPath('./public/vendor/three/examples/jsm/libs/draco/gltf/');
     this.gltf = new GLTFLoader().setDRACOLoader(draco);
     let [faces, sky, goldSky, reelArt, kit, badge] = await Promise.all([tex('textures/coin_faces.png'), tex('textures/sky_far_full.webp'), tex('textures/gold_island_full.webp'), loadReelArt(), this.gltf.loadAsync(ASSET + 'models/machine.glb'), tex('ui/sym_skull.webp')]);
     // 徽章图透明处底色是抠图绿，过滤时会渗出绿边：先合成到深色底上
@@ -97,6 +97,7 @@ export class GameView {
     if (this.w) this.resize(this.w, this.h);
     // 预编译全部着色器，避免开局第一次看到新材质时卡一下
     try { await this.renderer.compileAsync(this.scene, this.camera); } catch (e) { /* 旧浏览器没有 compileAsync */ }
+    if (this.effects?.warm) this.effects.warm.visible = false;   // 冲击环着色器的预编译样本，编译完就藏起来
   }
 
   // 黄铜 T 形栖架：底座环 + 短立杆 + 木横杆（两端黄铜帽）+ 小食槽
@@ -281,7 +282,7 @@ export class GameView {
     sh.mapSize.set(q.shadows, q.shadows); sh.map?.dispose(); sh.map = null;
     if (this.post) {
       this.post.bloom.enabled = q.bloom;
-      this.post.finish.uniforms.blur.value = q.tiltShift ? 0.75 : 0;
+      this.post.finish.uniforms.blur.value = q.tiltShift ? 0.75 : 0; this.post.setTaps(q.tiltTaps ?? 12);
       this.post.msaa = q.msaa;   // 实际采样数在 resize → post.setSize 里按 DPR 决定
       this._applyClearcoat();
     }
@@ -316,6 +317,12 @@ export class GameView {
     const floor = Math.min(this.dprMax, DPR_FLOOR[this.qName] ?? 1);
     let d = this.dpr;
     A.slowN = med > 21 ? A.slowN + 1 : 0;
+    // 分辨率已经降到本档下限还持续慢（连续 4 个窗口 ≈ 6 秒，Jackpot 之类的短时高峰不算）→ 自动降一档画质
+    if (d <= floor && A.slowN >= 4 && this.qName !== 'low') {
+      const next = this.qName === 'high' ? 'medium' : 'low';
+      this.setQuality(next); this.onAutoQuality?.(next);
+      return;
+    }
     if (A.trial && med > 19) { A.banned[A.trial] = now + 30000; d = A.trial - 0.25; A.trial = null; A.slowN = 0; }
     else if (A.slowN >= 2 && d > floor) { d = Math.max(floor, d - 0.25); A.slowN = 0; A.nextUp = now + 10000; }
     else if (med < 17.8 && slow < 0.05 && d < this.dprMax && now > A.nextUp && !((A.banned[d + 0.25] ?? 0) > now)) { d = Math.min(this.dprMax, d + 0.25); A.trial = d; A.nextUp = now + 10000; }

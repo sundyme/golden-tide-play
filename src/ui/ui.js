@@ -405,7 +405,7 @@ export class GameUI {
       this.popAcc = { v: 0, t: 0 };
     } else if (this.popAcc.v === 0) this.popAcc.t = 0;
     // 电影镜头时收起操作类 UI
-    this.root.classList.toggle('cinematic', this.started && view.director.mode !== 'play');
+    this.root.classList.toggle('cinematic', this.started && (view.director.mode !== 'play' || view.director.settled === false));   // 镜头还在路上时 HUD 也先别出来
     // 道具栏
     this.el.slots.forEach((s, i) => {
       const it = game.items[i];

@@ -43,7 +43,11 @@ export class Director {
       default: d = this._play(t, surge);
     }
     const a = 1 - Math.exp(-dt * this.k);
-    this.pos.lerp(d.pos, a); this.tgt.lerp(d.tgt, a);
+    // 大跨度转场（终局船尾 → 回到机台）：注视点先转回来、机位再慢慢飞过去。
+    // 两者同速插值时注视点要从船头前方远处一路扫回，中间约 1 秒画面里只有一片海（空镜）。
+    const far = this.tgt.distanceTo(d.tgt) > 30;
+    this.pos.lerp(d.pos, a); this.tgt.lerp(d.tgt, far ? 1 - Math.exp(-dt * this.k * 3.5) : a);
+    this.settled = this.mode === 'play' && this.pos.distanceTo(d.pos) < 2;   // 镜头到位：HUD 才回来
     const C = this.cfg.camera;
     this.fov += ((this.mode === 'play' ? C.fov : C.wideFov) - this.fov) * a;
     const fov = this._fit(this.fov);

@@ -6,7 +6,6 @@ import { Game } from './gameplay/game.js';
 import { GameView } from './scene/view.js';
 import { GameUI } from './ui/ui.js';
 import { GameAudio } from './audio/audio.js';
-import { DebugPanel } from './debug/panel.js';
 import { ParrotBuddy } from './ui/buddy.js';
 import { Tutorial, TUTORIAL_STEPS } from './ui/tutorial.js';
 
@@ -87,6 +86,7 @@ async function boot() {
     replayTutorial() { tut.reset(); persist(); },
   });
   ui.syncSettings(settings);
+  view.onAutoQuality = q => { settings.quality = q; ui.syncSettings(settings); persist(); };   // 设备带不动时自动降档，记下来下次直接用
   ui.onSay = text => audio.speak(text);   // 鹦鹉台词气泡 → 配音
   ui.showStart(best.won ? best : null);
   // 新手引导：老玩家（有存档、投过币、但存档里还没有引导记录）视为已完成；?tutorial 强制重来
@@ -151,7 +151,7 @@ async function boot() {
   canvas.addEventListener('pointercancel', up);
   addEventListener('keydown', e => {
     if (e.code === 'Space' && started && !paused) { e.preventDefault(); game.drop(dropX); }
-    if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') game.useItem(+e.code.slice(-1) - 1, dropX);
+    if ((e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') && started && !paused) game.useItem(+e.code.slice(-1) - 1, dropX);   // 面板 / 终局卡开着时不能用道具
   });
 
   // 切到后台：暂停 + 存档
@@ -166,7 +166,11 @@ async function boot() {
     item: k => game.debug('item', k), addCoins: (n = 50) => game.debug('coins', n),
     reset: () => { try { localStorage.removeItem(SAVE_KEY); } catch { } location.search = '?fresh'; },
   };
-  new DebugPanel(CONFIG, sim, actions);
+  // 调试面板（` 键 / ?debug）：按需加载，lil-gui 不进首屏
+  let debug = null;
+  const openDebug = () => debug ??= import('./debug/panel.js').then(m => { const d = new m.DebugPanel(CONFIG, sim, actions); d.gui.show(); return d; });
+  addEventListener('keydown', e => { if ((e.key === '`' || e.key === '·') && !debug) openDebug(); });
+  if (params.has('debug')) openDebug();
 
   // 截图钩子：渲染完这一帧后把画布 POST 给开发服务器（tools/devserver.mjs）
   let pendingShot = null;

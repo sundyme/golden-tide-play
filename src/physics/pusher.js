@@ -63,6 +63,12 @@ export class PusherPhysics {
     const tLen = M.tableFrontZ - back;
     fixed(halfW, M.tableThickness / 2, tLen / 2, 0, -M.tableThickness / 2, back + tLen / 2, 0.38);
 
+    // 台沿黄铜包边：模型里前沿是一根圆鼓鼓的铜条（顶面比台面高约 0.05、向外凸出约 0.25），
+    // 只用直角台面的话，币绕直角翻下去会插进铜条里（穿模）。补一根贴合铜条的横向胶囊，让币沿着包边滚落。
+    { const L = M.frontLip, r = L.r;
+      w.createCollider(R.ColliderDesc.capsule(halfW - r, r).setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 })
+        .setTranslation(0, L.y, L.z).setFriction(0.3).setRestitution(0.05)); }
+
     // 侧墙：从最后方到 sideOpenFromZ，之后两侧敞开（掉进海里）
     const sLen = M.sideOpenFromZ - back;
     for (const s of [-1, 1]) {

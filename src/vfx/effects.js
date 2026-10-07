@@ -1,5 +1,6 @@
-// 通用粒子演出（精灵池）：火花迸发、火药桶爆炸（闪光 + 火球 + 烟 + 冲击环）、炮口焰、宝箱倾倒的金光拖尾、鹦鹉羽毛。
+// 通用粒子演出（合批，见 batch.js）：火花迸发、火药桶爆炸（闪光 + 火球 + 烟 + 冲击环）、炮口焰、宝箱倾倒的金光拖尾、鹦鹉羽毛。
 import * as THREE from 'three';
+import { SpriteBatch } from './batch.js';
 
 function tex(kind) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -26,26 +27,31 @@ export class Effects {
     this.scene = scene;
     this.glow = tex('glow'); this.smoke = tex('smoke'); this.feather = tex('feather');
     this.items = [];
+    // 三批：发光（叠加）、烟（普通混合，先画）、羽毛（普通混合）
+    this.B = {
+      glow: new SpriteBatch(scene, { map: this.glow, blending: THREE.AdditiveBlending, cap: 420, renderOrder: 3 }),
+      smoke: new SpriteBatch(scene, { map: this.smoke, blending: THREE.NormalBlending, cap: 160, renderOrder: 2 }),
+      feather: new SpriteBatch(scene, { map: this.feather, blending: THREE.NormalBlending, cap: 60, renderOrder: 3 }),
+    };
     // 爆炸 / 炮口闪光：不再用实时点光源（每盏点光源都让全场每个像素多算一遍），
     // 只记录强度，由画面层加到全局暖光上
     this.flashLight = { intensity: 0, position: new THREE.Vector3() };
     const rg = new THREE.RingGeometry(0.8, 1, 48); rg.rotateX(-Math.PI / 2);
     this.ringGeo = rg;
+    // 冲击环 / 水花环还是独立网格（数量少）：开局放一个看不见的样本，让它的着色器随场景预编译，第一次爆炸不卡
+    this.warm = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.warm.scale.setScalar(0.001); scene.add(this.warm);
     this.trickleT = 0;
   }
 
   // p: 位置；o: {color, size, vel, life, grow, drag, gravity, smoke, opacity}
   _sprite(p, o) {
-    if (this.items.length > 400) return;
-    const m = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: o.smoke ? this.smoke : this.glow, color: new THREE.Color(o.color).multiplyScalar(o.smoke ? 1 : (o.hdr ?? 3)),
-      blending: o.smoke ? THREE.NormalBlending : THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: o.opacity ?? 1,
-    }));
+    const m = (o.smoke ? this.B.smoke : this.B.glow).add(new THREE.Color(o.color).multiplyScalar(o.smoke ? 1 : (o.hdr ?? 3)), o.opacity ?? 1);
+    if (!m) return;
     m.position.copy(p);
     m.userData = { t: 0, life: o.life, v: o.vel.clone(), size: o.size, grow: o.grow ?? 0, drag: o.drag ?? 0, g: o.gravity ?? 6, op: o.opacity ?? 1, smoke: !!o.smoke };
     m.scale.setScalar(o.size);
-    m.renderOrder = o.smoke ? 2 : 3;
-    this.scene.add(m); this.items.push(m);
+    this.items.push(m);
   }
 
   burst(p, color, n = 10, size = 0.5, speed = 4) {
@@ -59,14 +65,14 @@ export class Effects {
   feathers(p, n = 8) {
     const cols = [0xd8262a, 0xe8352c, 0x2a6fd8, 0xf2c230, 0x2fa86a];
     for (let i = 0; i < n; i++) {
-      if (this.items.length > 400) return;
-      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.feather, color: cols[i % cols.length], transparent: true, depthWrite: false, rotation: Math.random() * 6.28 }));
+      const m = this.B.feather.add(new THREE.Color(cols[i % cols.length]), 1, Math.random() * 6.28);
+      if (!m) return;
       m.position.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.6));
       const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.7 + 0.5, Math.random() - 0.3).normalize().multiplyScalar(3 + Math.random() * 3);
       const size = 0.85 + Math.random() * 0.45;
       m.userData = { t: 0, life: 1.6 + Math.random() * 0.8, v, size, grow: 0, drag: 3.2, g: 2.2, op: 1, feather: true, ph: Math.random() * 6.28, spin: (Math.random() - 0.5) * 6 };
-      m.scale.setScalar(size); m.renderOrder = 3;
-      this.scene.add(m); this.items.push(m);
+      m.scale.setScalar(size);
+      this.items.push(m);
     }
   }
 
@@ -114,7 +120,7 @@ export class Effects {
       const s = this.items[i], u = s.userData;
       u.t += dt;
       const k = u.t / u.life;
-      if (k >= 1) { this.scene.remove(s); s.material.dispose(); this.items.splice(i, 1); continue; }
+      if (k >= 1) { if (s._b) s._b.remove(s); else { this.scene.remove(s); s.material.dispose(); } this.items[i] = this.items[this.items.length - 1]; this.items.pop(); continue; }
       if (u.ring) { s.scale.setScalar(0.5 + u.size * (1 - (1 - k) ** 3)); s.material.opacity = 1 - k; continue; }
       u.v.multiplyScalar(Math.exp(-u.drag * dt)); u.v.y -= u.g * dt;
       if (u.feather) {   // 飘落：限速下落 + 左右摆 + 转动，最后淡出
@@ -129,5 +135,6 @@ export class Effects {
       s.scale.setScalar(u.size * (1 + u.grow * k));
       s.material.opacity = u.op * (u.smoke ? (1 - k) * Math.min(1, k * 6) : (1 - k) * (1 - k));
     }
+    for (const b of Object.values(this.B)) b.flush();
   }
 }

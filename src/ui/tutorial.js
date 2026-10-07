@@ -82,7 +82,8 @@ export class Tutorial {
   update(dt) {
     if (this.finished && !this.active) return;
     const g = this.game, V = this.view;
-    const busy = V.director.mode !== 'play' || g.jackpot || g.ending;
+    // 横幅（大潮 / 连线 / 道具……）占着画面中部时先收起引导卡，别压在横幅上
+    const busy = V.director.mode !== 'play' || g.jackpot || g.ending || performance.now() < (this.ui.bannerUntil ?? 0);
     if (this.won0 && !this.done.has('win') && this.done.has('gate')) this.pending.add('win');
     if (!this.done.has('queue') && g.slot.queue > 0 && this.ui.el.spins.classList.contains('on')) this.pending.add('queue');
     this.wait -= dt;
