@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#050b1c" />
   <link rel="icon" href="./public/assets/ui/icon_coin.webp" />
   <!-- 字体、three、Rapier 全部本地托管（Google Fonts / jsDelivr 在国内不稳定）；字体子集用 tools/build_fonts.py 生成 -->
+  <link rel="preload" href="./public/assets/ui/logo.webp" as="image" fetchpriority="high" />
   <link rel="preload" href="./public/assets/fonts/zcool-qingke.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="./public/assets/fonts/lilita-one.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="modulepreload" href="./public/vendor/three/build/three.core.min.js" />
@@ -25,7 +26,7 @@
     /* 加载页：装饰艺术风的进度条（藏蓝珐琅槽 + 香槟金描边 + 金色进度 + 流光），两端各一颗菱形饰钉 */
     #loading { --u: min(1cqw, .8vh); background: radial-gradient(70% 45% at 50% 42%, #14305a 0%, #0a1830 55%, #050b18 100%); }
     #loading .inner { display: flex; flex-direction: column; align-items: center; }
-    #loading .logo { width: calc(62 * var(--u)); filter: drop-shadow(0 calc(1.4 * var(--u)) calc(2 * var(--u)) #000a) drop-shadow(0 0 calc(4 * var(--u)) #ffc23a33); animation: loadfloat 3s ease-in-out infinite; }
+    #loading .logo { width: calc(62 * var(--u)); aspect-ratio: 1200 / 758; filter: drop-shadow(0 calc(1.4 * var(--u)) calc(2 * var(--u)) #000a) drop-shadow(0 0 calc(4 * var(--u)) #ffc23a33); animation: loadfloat 3s ease-in-out infinite; }
     #loading .track { position: relative; width: calc(56 * var(--u)); margin-top: calc(7 * var(--u)); display: flex; align-items: center; justify-content: center; }
     #loading .track::before, #loading .track::after { content: ""; position: absolute; top: 50%; width: calc(2.4 * var(--u)); height: calc(2.4 * var(--u)); background: linear-gradient(135deg, #fff1c8, #d9b46a 50%, #8e6a30); transform: translateY(-50%) rotate(45deg); box-shadow: 0 0 calc(1.4 * var(--u)) #ffc23a66; }
     #loading .track::before { left: calc(-1.2 * var(--u)); } #loading .track::after { right: calc(-1.2 * var(--u)); }
@@ -33,6 +34,10 @@
     #loading .bar i { position: relative; display: block; height: 100%; width: 0; border-radius: calc(.7 * var(--u)); background: linear-gradient(180deg, #fff1c8 0%, #ffd36a 45%, #c47a1c 100%); box-shadow: 0 0 calc(1.6 * var(--u)) #ffc23a99; transition: width .35s ease-out; overflow: hidden; }
     #loading .bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, #fff9 50%, transparent 70%) -100% 0/60% 100% no-repeat; animation: loadshine 1.6s linear infinite; }
     #loading .msg { margin-top: calc(3.4 * var(--u)); font: calc(3.6 * var(--u)) "ZCOOL QingKe HuangYou", "Hiragino Sans GB", sans-serif; letter-spacing: .4em; text-indent: .4em; color: #e9d3a0; opacity: .85; }
+    #loading .msg b { font: calc(3.4 * var(--u)) "Lilita One", sans-serif; letter-spacing: .04em; margin-left: calc(1.6 * var(--u)); color: #ffd36a; font-variant-numeric: tabular-nums; }
+    /* 加载提示：首次访问提醒要下载资源；太久还没好就换一句安抚的话（文案由下面的内联脚本按情况填） */
+    #loading .tip { margin-top: calc(2.4 * var(--u)); max-width: calc(88 * var(--u)); min-height: 2.6em; font: calc(3.2 * var(--u))/1.5 "ZCOOL QingKe HuangYou", "Hiragino Sans GB", sans-serif; letter-spacing: .12em; color: #c9b88f; text-align: center; opacity: 0; transition: opacity .6s; }
+    #loading .tip.on { opacity: .8; }
     #loading .snd { margin-top: calc(6 * var(--u)); display: flex; align-items: center; gap: calc(1.4 * var(--u)); font: calc(3 * var(--u)) "ZCOOL QingKe HuangYou", "Hiragino Sans GB", sans-serif; letter-spacing: .2em; color: #e9d3a0; opacity: .55; animation: sndblink 2.4s ease-in-out infinite; transition: opacity .4s; }
     #loading .snd svg { width: calc(4 * var(--u)); height: calc(4 * var(--u)); fill: currentColor; }
     .snd-on #loading .snd { opacity: 0; animation: none; }
@@ -62,11 +67,32 @@
 <body>
   <div id="stage">
     <div id="frame">
-      <div id="loading"><div class="inner"><img class="logo" src="./public/assets/ui/logo.webp" alt=""><div class="track"><div class="bar"><i id="loadbar"></i></div></div><div class="msg">起锚中…</div><div class="snd"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>轻触屏幕 · 开启配乐</div></div></div>
+      <div id="loading"><div class="inner"><img class="logo" src="./public/assets/ui/logo.webp" alt=""><div class="track"><div class="bar"><i id="loadbar"></i></div></div><div class="msg"><span id="loadmsg">起锚中…</span><b id="loadpct">0%</b></div><div class="tip" id="loadtip"></div><div class="snd"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>轻触屏幕 · 开启配乐</div></div></div>
       <div id="stats"></div>
     </div>
   </div>
   <div id="rotate"><svg viewBox="0 0 64 64"><rect x="20" y="8" width="24" height="44" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="46" r="2" fill="currentColor"/><path d="M50 30a18 18 0 0 0-10-14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M38 12l3 5-5 2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><b>请把手机竖过来玩</b><span>金潮号是竖屏游戏</span></div>
+  <script>
+    // 加载进度：游戏代码要等物理引擎 / three 这些模块下载完才开始跑（首次约 2 MB），之前进度条会一直停在 0 像卡住。
+    // 这段内联脚本先让进度条缓慢前进（0 → 30%），之后由 main.js 按真实加载的资源数推进（__load.set）。
+    (() => {
+      const bar = document.getElementById('loadbar'), pct = document.getElementById('loadpct'), msg = document.getElementById('loadmsg'), tip = document.getElementById('loadtip');
+      let first = true; try { first = !localStorage.getItem('goldenTide.cached'); } catch { }
+      const L = window.__load = {
+        p: 0, t0: performance.now(),
+        set(v, text) { if (v > this.p) { this.p = Math.min(100, v); bar.style.width = this.p + '%'; pct.textContent = Math.floor(this.p) + '%'; } if (text) msg.textContent = text; },
+        tip(text) { tip.textContent = text; tip.classList.toggle('on', !!text); },
+        done() { clearInterval(this.timer); try { localStorage.setItem('goldenTide.cached', '1'); } catch { } },
+      };
+      if (first) L.tip('首次加载需要下载约 5 MB 资源，请耐心等待\n之后再来就快了');
+      tip.style.whiteSpace = 'pre-line';
+      L.timer = setInterval(() => {
+        const t = (performance.now() - L.t0) / 1000;
+        if (!L.started) L.set(30 * (1 - Math.exp(-t / 5)));
+        if (t > 12 && !L.slow) { L.slow = true; L.tip('网络有点慢，船员正在努力装货……\n再稍等一会儿'); }
+      }, 200);
+    })();
+  </script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

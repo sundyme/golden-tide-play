@@ -1,5 +1,6 @@
 // 入口：固定步长物理 + 规则层 Game + 画面 / UI / 音频订阅事件；存档、暂停、输入、截图钩子。
 import RAPIER from '@dimforge/rapier3d-compat';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { PusherPhysics } from './physics/pusher.js';
 import { Game } from './gameplay/game.js';
@@ -34,14 +35,19 @@ async function boot() {
   try { audio.prepare(); } catch (e) { console.warn('audio', e); }
   for (const ev of ['pointerdown', 'keydown', 'touchend']) document.addEventListener(ev, () => audio.unlock(), { capture: true, passive: true });
 
+  const load = window.__load ?? { set() { }, tip() { }, done() { } };   // 加载页进度条（index.html 内联脚本）
+  load.started = true; load.set(32, '启动引擎…');
   await RAPIER.init();
+  load.set(38, '装货上船…');
+  // 模型 / 贴图按真实完成的个数推进进度条（38 → 90%）
+  THREE.DefaultLoadingManager.onProgress = (url, n, total) => load.set(38 + 52 * n / Math.max(total, 1));
   const sim = new PusherPhysics(RAPIER, CONFIG);
   const view = new GameView(canvas, CONFIG, settings.quality);
   const fit = () => view.resize(frame.clientWidth, frame.clientHeight);
   fit();
   addEventListener('resize', fit);
   await view.ready;
-  $('loadbar').style.width = '70%';
+  load.set(92, '清点金币…');
 
   // 开局：预烘焙沉降结果（缺失时现场沉降）
   const baked = await fetch('./public/assets/settle.json').then(r => r.ok ? r.json() : null).catch(() => null);
@@ -52,7 +58,7 @@ async function boot() {
     for (let i = 0; i < total;) {
       const t0 = performance.now();
       while (i < total && performance.now() - t0 < 12) { sim.step({ silent: true }); i++; }
-      $('loadbar').style.width = `${70 + 30 * i / total}%`;
+      load.set(92 + 8 * i / total);
       await new Promise(r => setTimeout(r, 0));
     }
     sim.settleFinish();
@@ -109,6 +115,7 @@ async function boot() {
     if (e.type === 'endingCard') { best.endings++; persist(); }
   });
   audio.revealTitle();   // 起航页出现：序曲落下全奏（还没解锁就等第一次点击）
+  load.set(100); load.done();
   $('loading').style.opacity = 0;
   setTimeout(() => $('loading').remove(), 450);
 

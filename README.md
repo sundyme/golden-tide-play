@@ -4,7 +4,7 @@
 
 **试玩：https://sundyme.github.io/golden-tide-play/**
 
-手机和电脑浏览器都能玩（推荐 Chrome / Safari 最新版）。本仓库放发布版本的游戏文件和起步包，当前版本 v2.5（资源全部本地托管，国内也能正常加载；性能与界面细节修复）。
+手机和电脑浏览器都能玩（推荐 Chrome / Safari 最新版）。本仓库放发布版本的游戏文件和起步包，当前版本 v2.6（加载页显示真实进度与首次加载提示）。
 
 **美术分支试玩 · 汽水海（糖果色）：https://sundyme.github.io/golden-tide-play/soda/**
 
